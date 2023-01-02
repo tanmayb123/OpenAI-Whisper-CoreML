@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import AVFoundation
 
 struct ContentView: View {
     let whisper: Whisper
@@ -44,22 +45,19 @@ struct ContentView: View {
             fatalError("Couldn't record. Error: \(error)")
         }
         
-        Timer.scheduledTimer(withTimeInterval: 10, repeats: false) { _ in
-            let audio: [Float]
-            do {
-                audio = try recorder.finishRecording()
-            } catch let error {
-                fatalError("Couldn't finish recording. Error: \(error)")
-            }
-            
+        let audioAssetURL: URL
+        do {
+            audioAssetURL = try recorder.finishRecording()
+        } catch let error {
+            fatalError("Couldn't finish recording. Error: \(error)")
+        }
+        
+        Task {
             do {
                 let start = Date().timeIntervalSince1970
-                var input = [Double](repeating: 0, count: 16000 * 30)
-                for i in 0..<min(audio.count, input.count) {
-                    input[i] = Double(audio[i])
-                }
-                let encoded = try whisper.encode(audio: input)
-                try whisper.decode(audioFeatures: encoded)
+                
+                await whisper.predict(assetURL: audioAssetURL)
+                
                 print(Date().timeIntervalSince1970 - start)
             } catch let error {
                 fatalError("Couldn't predict. Error: \(error)")

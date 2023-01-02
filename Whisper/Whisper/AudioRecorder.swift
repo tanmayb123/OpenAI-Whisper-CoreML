@@ -66,24 +66,12 @@ class AudioRecorder: NSObject, ObservableObject, AVAudioRecorderDelegate {
         recording = true
     }
     
-    func finishRecording() throws -> [Float] {
+    func finishRecording() throws -> URL {
         audioRecorder.stop()
         audioRecorder = nil
         recording = false
         
-        let file = try AVAudioFile(forReading: Self.audioURL)
-        guard let format = AVAudioFormat(commonFormat: .pcmFormatFloat32,
-                                         sampleRate: 16000, channels: 1,
-                                         interleaved: false) else {
-            throw RecordingError.invalidFormat
-        }
-        guard let buf = AVAudioPCMBuffer(pcmFormat: format,
-                                         frameCapacity: UInt32(file.length)) else {
-            throw RecordingError.noBuffer
-        }
-        try file.read(into: buf)
-        
-        return Array<Float>(UnsafeBufferPointer(buf.audioBufferList.pointee.mBuffers))
+        return AudioRecorder.audioURL
     }
     
     func audioRecorderDidFinishRecording(_ recorder: AVAudioRecorder, successfully flag: Bool) {

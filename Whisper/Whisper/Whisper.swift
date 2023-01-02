@@ -7,35 +7,196 @@
 
 import Foundation
 import CoreML
+import AVFoundation
 
-struct Whisper {
+public class Whisper {
+    
+    // hard-coded audio hyperparameters
+    static let kWhisperSampleRate:Int = 16000;
+    static let kWhisperNumFFTs:Int = 400;
+    static let kWhisperNumMels:Int = 80;
+    static let kWhisperHopLength:Int = 160;
+    static let kWhisperChunkTimeSeconds:Int = 30;
+    // kWhisperChunkTimeSeconds * kWhisperSampleRate  # 480000: number of samples in a chunk
+    static let kWhisperNumSamplesInChunk:Int = 480000; // Raw audio chunks we convert to MEL
+    // exact_div(kWhisperNumSamplesInChunk, kWhisperHopLength)  # 3000: number of frames in a mel spectrogram input
+    static let kWhisperNumSamplesInMel:Int = 3000; // frames of Mel spectrograms
+    
     static let LANGUAGES = ["en", "zh", "de", "es", "ru", "ko", "fr", "ja", "pt", "tr", "pl", "ca", "nl", "ar", "sv", "it", "id", "hi", "fi", "vi", "iw", "uk", "el", "ms", "cs", "ro", "da", "hu", "ta", "no", "th", "ur", "hr", "bg", "lt", "la", "mi", "ml", "cy", "sk", "te", "fa", "lv", "bn", "sr", "az", "sl", "kn", "et", "mk", "br", "eu", "is", "hy", "ne", "mn", "bs", "kk", "sq", "sw", "gl", "mr", "pa", "si", "km", "sn", "yo", "so", "af", "oc", "ka", "be", "tg", "sd", "gu", "am", "yi", "lo", "uz", "fo", "ht", "ps", "tk", "nn", "mt", "sa", "lb", "my", "bo", "tl", "mg", "as", "tt", "haw", "ln", "ha", "ba", "jw", "su"]
     
     let decoderModel: decoder
     let encoderModel: encoder
+    let mel:MelSpectrogram = MelSpectrogram()
+
+    // a chunk of audio samples, we decode that amount from some input
+    // it seems like we pad by 200 in the beginning and end?
+    var accruedAudioSamples:[Float] = [Float](repeating: 0, count: Whisper.kWhisperNumSamplesInChunk + 400)
+    var numOfAccruedAudioSamples:Int = 0
     
     init() throws {
         let config = MLModelConfiguration()
+        config.computeUnits = .all
+        
         self.decoderModel = try decoder(configuration: config)
         self.encoderModel = try encoder(configuration: config)
     }
     
-    func encode(audio: [Double]) throws -> MLMultiArray {
-        let spec = generateSpectrogram(audio: audio)
+    func encode(audio: [Float]) throws -> MLMultiArray {
+        mel.processData(values: audio)
+
+        let spec = mel.melSpectrumValues
         let array = try MLMultiArray(shape: [1, 80, 3000], dataType: .float32)
+
         for (index, value) in spec.enumerated() {
-            array[index] = NSNumber(floatLiteral: value)
+            array[index] = NSNumber(value: value)
         }
-        let encoded = try encoderModel.prediction(x_1: array).var_1385
+
+        let encoded = try encoderModel.prediction(audio_input:array).var_1373
         return encoded
     }
     
     func decode(audioFeatures: MLMultiArray) throws {
         let sotToken = try MLMultiArray(shape: [1, 1], dataType: .float32)
         sotToken[0] = NSNumber(integerLiteral: 50258)
-        let decoded = try decoderModel.prediction(x_1: sotToken, xa: audioFeatures).var_2217
+        let decoded = try decoderModel.prediction(token_data: sotToken, audio_data: audioFeatures).var_2205
         let confidence = (50259...50357).map { decoded[$0].floatValue }
         let (langIdx, _) = confidence.enumerated().max { $0.element < $1.element }!
         print(Self.LANGUAGES[langIdx])
     }
+    
+    
+    // this function accrues
+    func accrueSamplesFromSampleBuffer(sampleBuffer:CMSampleBuffer)
+    {
+        let audioBufferListSize:Int = 0
+        
+        CMSampleBufferGetAudioBufferListWithRetainedBlockBuffer(sampleBuffer, bufferListSizeNeededOut: nil, bufferListOut: nil, bufferListSize:audioBufferListSize, blockBufferAllocator: nil, blockBufferMemoryAllocator: nil, flags: kCMSampleBufferFlag_AudioBufferList_Assure16ByteAlignment, blockBufferOut: nil)
+        
+        let unsafeAudioBufferList:UnsafeMutablePointer<AudioBufferList>? = nil
+        
+        let unsafeBlockBuffer:UnsafeMutablePointer<CMBlockBuffer?>? = nil
+        
+        CMSampleBufferGetAudioBufferListWithRetainedBlockBuffer(sampleBuffer, bufferListSizeNeededOut: nil, bufferListOut: unsafeAudioBufferList, bufferListSize: audioBufferListSize, blockBufferAllocator: nil, blockBufferMemoryAllocator: nil, flags: kCMSampleBufferFlag_AudioBufferList_Assure16ByteAlignment, blockBufferOut: unsafeBlockBuffer)
+        
+        // Determine the number of samples we need from our audio
+        
+        let numAvailableSamples = CMSampleBufferGetNumSamples(sampleBuffer)
+        
+        // Calculate the number of samples we have to acrrue to get a full chunk
+        let remainingSampleCount = Whisper.kWhisperNumSamplesInChunk - self.accruedAudioSamples.count;
+        
+        let samplesToAccrue = min(numAvailableSamples, numAvailableSamples);
+        
+        let remainingCurrentSamplesInBuffer = numAvailableSamples - samplesToAccrue;
+        
+        guard let audioBufferList = unsafeAudioBufferList?.pointee else {
+            print("could not get audioBufferList from Sample Buffer - bailing on this sample")
+            return
+        }
+        
+        let numberOfBuffers = audioBufferList.mNumberBuffers
+        
+        for _ in 0 ... numberOfBuffers
+        {
+            let channelData:(AudioBuffer) = audioBufferList.mBuffers
+            
+            for (i) in 0 ... channelData.mNumberChannels
+            {
+                guard let floatArray = channelData.mData?.bindMemory(to: [[Float]].self, capacity: Int(channelData.mDataByteSize)).pointee else
+                {
+                    print("unable to get audioBufferList Channel Data - bailing")
+                    break
+                }
+                
+                let ithChannelOfSamples:[Float] = floatArray[Int(i)]
+                
+                self.accruedAudioSamples.insert(contentsOf: ithChannelOfSamples, at: self.numOfAccruedAudioSamples + 200)
+                
+                self.numOfAccruedAudioSamples = self.numOfAccruedAudioSamples + samplesToAccrue
+                
+            }
+        }
+    
+    }
+    
+    
+    func predict(assetURL:URL) async
+    {
+        let asset = AVURLAsset(url:assetURL)
+        
+        do {
+            let assetReader = try AVAssetReader(asset: asset)
+            
+            let audioTracks = try await asset.loadTracks(withMediaType: .audio)
+            
+            let audioOutputSettings = [ AVFormatIDKey : kAudioFormatLinearPCM,
+                                      AVSampleRateKey : 16000,
+                                AVLinearPCMBitDepthKey: 32,
+                                 AVNumberOfChannelsKey: 1,
+                                AVLinearPCMIsFloatKey : true,
+                           AVLinearPCMIsNonInterleaved: false,
+                             AVLinearPCMIsBigEndianKey: false
+                                        
+            ] as [String : Any]
+            
+            let audioOutput = AVAssetReaderAudioMixOutput(audioTracks: audioTracks, audioSettings: audioOutputSettings)
+            audioOutput.alwaysCopiesSampleData = false
+            
+            if ( assetReader.canAdd(audioOutput) )
+            {
+                assetReader.add(audioOutput)
+            }
+            
+            assetReader.startReading()
+            
+            let startTime = NSDate.timeIntervalSinceReferenceDate
+            
+            while ( assetReader.status == .reading )
+            {
+                guard let audioSampleBuffer = audioOutput.copyNextSampleBuffer() else {
+                    
+                    // Some media formats can have weird decode issues.
+                    // Unless our asset reader EXPLICITELT tells us its done, keep trying to decode.
+                    // We just skip bad samples
+                    if ( assetReader.status == .reading)
+                    {
+                        continue
+                    }
+                    
+                    else if (assetReader.status == .completed)
+                    {
+                        break;
+                    }
+                    
+                    else
+                    {
+                        // something went wrong
+                        print(assetReader.error as Any)
+                        return
+                    }
+                        
+                }
+                                        
+                self.accrueSamplesFromSampleBuffer(sampleBuffer: audioSampleBuffer)
+                
+            }
+            
+            let processingTime = startTime - NSDate.timeIntervalSinceReferenceDate
+            
+            print("Decode and Predict took", processingTime, "seconds")
+            
+            let assetDuration = try await asset.load(.duration).seconds
+            
+            print("Movie is", assetDuration)
+            print("Realtime Factor is", assetDuration / processingTime)
+
+        }
+        catch let error
+        {
+            print("Unable to process asset:")
+            print(error)
+            exit(0)
+        }
+    }
+    
 }
