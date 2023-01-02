@@ -14,6 +14,9 @@
 		01AF991F28E2A97E002DAC53 /* Whisper.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01AF991E28E2A97E002DAC53 /* Whisper.swift */; };
 		01AF992528E2D90F002DAC53 /* AudioRecorder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01AF992428E2D90F002DAC53 /* AudioRecorder.swift */; };
 		1B6A59D929634F2A004C510D /* MelSpectrogram.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1B6A59D829634F2A004C510D /* MelSpectrogram.swift */; };
+		1B6A59DC29635145004C510D /* decoder.mlpackage in Sources */ = {isa = PBXBuildFile; fileRef = 1B6A59DA29635145004C510D /* decoder.mlpackage */; };
+		1B6A59DD29635145004C510D /* encoder.mlpackage in Sources */ = {isa = PBXBuildFile; fileRef = 1B6A59DB29635145004C510D /* encoder.mlpackage */; };
+		1B6A59DF2963A1A6004C510D /* mel_filters.data in Resources */ = {isa = PBXBuildFile; fileRef = 1B6A59DE2963A1A6004C510D /* mel_filters.data */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -26,7 +29,10 @@
 		01AF991E28E2A97E002DAC53 /* Whisper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Whisper.swift; sourceTree = "<group>"; };
 		01AF992428E2D90F002DAC53 /* AudioRecorder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioRecorder.swift; sourceTree = "<group>"; };
 		01AF992628E2D9B9002DAC53 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
-		1B6A59D829634F2A004C510D /* MelSpectrogram.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = MelSpectrogram.swift; path = Whisper/MelSpectrogram.swift; sourceTree = "<group>"; };
+		1B6A59D829634F2A004C510D /* MelSpectrogram.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MelSpectrogram.swift; sourceTree = "<group>"; };
+		1B6A59DA29635145004C510D /* decoder.mlpackage */ = {isa = PBXFileReference; lastKnownFileType = folder.mlpackage; path = decoder.mlpackage; sourceTree = "<group>"; };
+		1B6A59DB29635145004C510D /* encoder.mlpackage */ = {isa = PBXFileReference; lastKnownFileType = folder.mlpackage; path = encoder.mlpackage; sourceTree = "<group>"; };
+		1B6A59DE2963A1A6004C510D /* mel_filters.data */ = {isa = PBXFileReference; lastKnownFileType = file; path = mel_filters.data; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -43,7 +49,6 @@
 		01AF98EC28E28BF2002DAC53 = {
 			isa = PBXGroup;
 			children = (
-				1B6A59D829634F2A004C510D /* MelSpectrogram.swift */,
 				01AF98F728E28BF2002DAC53 /* Whisper */,
 				01AF98F628E28BF2002DAC53 /* Products */,
 				01AF990828E28C2E002DAC53 /* Frameworks */,
@@ -62,10 +67,14 @@
 			isa = PBXGroup;
 			children = (
 				01AF992628E2D9B9002DAC53 /* Info.plist */,
-				01AF991E28E2A97E002DAC53 /* Whisper.swift */,
-				01AF992428E2D90F002DAC53 /* AudioRecorder.swift */,
 				01AF98F828E28BF2002DAC53 /* WhisperApp.swift */,
+				1B6A59DE2963A1A6004C510D /* mel_filters.data */,
+				01AF991E28E2A97E002DAC53 /* Whisper.swift */,
+				1B6A59D829634F2A004C510D /* MelSpectrogram.swift */,
+				01AF992428E2D90F002DAC53 /* AudioRecorder.swift */,
 				01AF98FA28E28BF2002DAC53 /* ContentView.swift */,
+				1B6A59DA29635145004C510D /* decoder.mlpackage */,
+				1B6A59DB29635145004C510D /* encoder.mlpackage */,
 				01AF98FC28E28BF3002DAC53 /* Assets.xcassets */,
 				01AF98FE28E28BF3002DAC53 /* Preview Content */,
 			);
@@ -146,6 +155,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				1B6A59DF2963A1A6004C510D /* mel_filters.data in Resources */,
 				01AF990028E28BF3002DAC53 /* Preview Assets.xcassets in Resources */,
 				01AF98FD28E28BF3002DAC53 /* Assets.xcassets in Resources */,
 			);
@@ -160,8 +170,10 @@
 			files = (
 				01AF992528E2D90F002DAC53 /* AudioRecorder.swift in Sources */,
 				01AF98FB28E28BF2002DAC53 /* ContentView.swift in Sources */,
+				1B6A59DC29635145004C510D /* decoder.mlpackage in Sources */,
 				1B6A59D929634F2A004C510D /* MelSpectrogram.swift in Sources */,
 				01AF98F928E28BF2002DAC53 /* WhisperApp.swift in Sources */,
+				1B6A59DD29635145004C510D /* encoder.mlpackage in Sources */,
 				01AF991F28E2A97E002DAC53 /* Whisper.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -291,7 +303,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_ASSET_PATHS = "\"Whisper/Preview Content\"";
-				DEVELOPMENT_TEAM = 998XWVFVMR;
+				DEVELOPMENT_TEAM = SHG3AW6YV7;
 				ENABLE_PREVIEWS = YES;
 				GCC_OPTIMIZATION_LEVEL = fast;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -303,6 +315,7 @@
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationPortrait;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight UIInterfaceOrientationPortraitUpsideDown";
+				IPHONEOS_DEPLOYMENT_TARGET = 15.5;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -311,9 +324,13 @@
 					"$(inherited)",
 					"$(PROJECT_DIR)/Whisper",
 				);
+				MACOSX_DEPLOYMENT_TARGET = 12.4;
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = tbss.Whisper;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx";
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_OPTIMIZATION_LEVEL = "-O";
 				SWIFT_VERSION = 5.0;
@@ -329,7 +346,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_ASSET_PATHS = "\"Whisper/Preview Content\"";
-				DEVELOPMENT_TEAM = 998XWVFVMR;
+				DEVELOPMENT_TEAM = SHG3AW6YV7;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				HEADER_SEARCH_PATHS = "$(PROJECT_DIR)/Whisper";
@@ -340,6 +357,7 @@
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationPortrait;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight UIInterfaceOrientationPortraitUpsideDown";
+				IPHONEOS_DEPLOYMENT_TARGET = 15.5;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -348,9 +366,13 @@
 					"$(inherited)",
 					"$(PROJECT_DIR)/Whisper",
 				);
+				MACOSX_DEPLOYMENT_TARGET = 12.4;
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = tbss.Whisper;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx";
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
