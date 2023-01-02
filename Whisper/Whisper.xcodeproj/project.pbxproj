@@ -11,11 +11,7 @@
 		01AF98FB28E28BF2002DAC53 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01AF98FA28E28BF2002DAC53 /* ContentView.swift */; };
 		01AF98FD28E28BF3002DAC53 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 01AF98FC28E28BF3002DAC53 /* Assets.xcassets */; };
 		01AF990028E28BF3002DAC53 /* Preview Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 01AF98FF28E28BF3002DAC53 /* Preview Assets.xcassets */; };
-		01AF990C28E28C8C002DAC53 /* stft.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01AF990B28E28C8C002DAC53 /* stft.swift */; };
-		01AF991C28E2A948002DAC53 /* decoder.mlpackage in Sources */ = {isa = PBXBuildFile; fileRef = 01AF991A28E2A944002DAC53 /* decoder.mlpackage */; };
-		01AF991D28E2A948002DAC53 /* encoder.mlpackage in Sources */ = {isa = PBXBuildFile; fileRef = 01AF991B28E2A948002DAC53 /* encoder.mlpackage */; };
 		01AF991F28E2A97E002DAC53 /* Whisper.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01AF991E28E2A97E002DAC53 /* Whisper.swift */; };
-		01AF992328E2D5FF002DAC53 /* libstft.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 01AF992228E2D5FF002DAC53 /* libstft.a */; };
 		01AF992528E2D90F002DAC53 /* AudioRecorder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01AF992428E2D90F002DAC53 /* AudioRecorder.swift */; };
 /* End PBXBuildFile section */
 
@@ -26,12 +22,7 @@
 		01AF98FC28E28BF3002DAC53 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		01AF98FF28E28BF3002DAC53 /* Preview Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = "Preview Assets.xcassets"; sourceTree = "<group>"; };
 		01AF990928E28C2E002DAC53 /* libresolv.tbd */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.text-based-dylib-definition"; name = libresolv.tbd; path = usr/lib/libresolv.tbd; sourceTree = SDKROOT; };
-		01AF990A28E28C44002DAC53 /* bridge.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = bridge.h; sourceTree = "<group>"; };
-		01AF990B28E28C8C002DAC53 /* stft.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = stft.swift; sourceTree = "<group>"; };
-		01AF991A28E2A944002DAC53 /* decoder.mlpackage */ = {isa = PBXFileReference; lastKnownFileType = folder.mlpackage; path = decoder.mlpackage; sourceTree = "<group>"; };
-		01AF991B28E2A948002DAC53 /* encoder.mlpackage */ = {isa = PBXFileReference; lastKnownFileType = folder.mlpackage; path = encoder.mlpackage; sourceTree = "<group>"; };
 		01AF991E28E2A97E002DAC53 /* Whisper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Whisper.swift; sourceTree = "<group>"; };
-		01AF992228E2D5FF002DAC53 /* libstft.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; path = libstft.a; sourceTree = "<group>"; };
 		01AF992428E2D90F002DAC53 /* AudioRecorder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioRecorder.swift; sourceTree = "<group>"; };
 		01AF992628E2D9B9002DAC53 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -41,7 +32,6 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				01AF992328E2D5FF002DAC53 /* libstft.a in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -69,11 +59,6 @@
 			isa = PBXGroup;
 			children = (
 				01AF992628E2D9B9002DAC53 /* Info.plist */,
-				01AF992228E2D5FF002DAC53 /* libstft.a */,
-				01AF990A28E28C44002DAC53 /* bridge.h */,
-				01AF991A28E2A944002DAC53 /* decoder.mlpackage */,
-				01AF991B28E2A948002DAC53 /* encoder.mlpackage */,
-				01AF990B28E28C8C002DAC53 /* stft.swift */,
 				01AF991E28E2A97E002DAC53 /* Whisper.swift */,
 				01AF992428E2D90F002DAC53 /* AudioRecorder.swift */,
 				01AF98F828E28BF2002DAC53 /* WhisperApp.swift */,
@@ -170,13 +155,10 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				01AF991D28E2A948002DAC53 /* encoder.mlpackage in Sources */,
 				01AF992528E2D90F002DAC53 /* AudioRecorder.swift in Sources */,
 				01AF98FB28E28BF2002DAC53 /* ContentView.swift in Sources */,
 				01AF98F928E28BF2002DAC53 /* WhisperApp.swift in Sources */,
-				01AF991C28E2A948002DAC53 /* decoder.mlpackage in Sources */,
 				01AF991F28E2A97E002DAC53 /* Whisper.swift in Sources */,
-				01AF990C28E28C8C002DAC53 /* stft.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -329,7 +311,6 @@
 				PRODUCT_BUNDLE_IDENTIFIER = tbss.Whisper;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
-				SWIFT_OBJC_BRIDGING_HEADER = "$(PROJECT_DIR)/Whisper/bridge.h";
 				SWIFT_OPTIMIZATION_LEVEL = "-O";
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
@@ -367,7 +348,6 @@
 				PRODUCT_BUNDLE_IDENTIFIER = tbss.Whisper;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
-				SWIFT_OBJC_BRIDGING_HEADER = "$(PROJECT_DIR)/Whisper/bridge.h";
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
