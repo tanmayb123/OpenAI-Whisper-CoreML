@@ -24,8 +24,8 @@ public class Whisper {
     
     static let LANGUAGES = ["en", "zh", "de", "es", "ru", "ko", "fr", "ja", "pt", "tr", "pl", "ca", "nl", "ar", "sv", "it", "id", "hi", "fi", "vi", "iw", "uk", "el", "ms", "cs", "ro", "da", "hu", "ta", "no", "th", "ur", "hr", "bg", "lt", "la", "mi", "ml", "cy", "sk", "te", "fa", "lv", "bn", "sr", "az", "sl", "kn", "et", "mk", "br", "eu", "is", "hy", "ne", "mn", "bs", "kk", "sq", "sw", "gl", "mr", "pa", "si", "km", "sn", "yo", "so", "af", "oc", "ka", "be", "tg", "sd", "gu", "am", "yi", "lo", "uz", "fo", "ht", "ps", "tk", "nn", "mt", "sa", "lb", "my", "bo", "tl", "mg", "as", "tt", "haw", "ln", "ha", "ba", "jw", "su"]
     
-    let decoderModel: decoder
-    let encoderModel: encoder
+//    let decoderModel: decoder
+//    let encoderModel: encoder
     let mel:MelSpectrogram = MelSpectrogram()
 
     // a chunk of audio samples, we decode that amount from some input
@@ -37,8 +37,8 @@ public class Whisper {
         let config = MLModelConfiguration()
         config.computeUnits = .all
         
-        self.decoderModel = try decoder(configuration: config)
-        self.encoderModel = try encoder(configuration: config)
+//        self.decoderModel = try decoder(configuration: config)
+//        self.encoderModel = try encoder(configuration: config)
         
         self.accruedAudioSamples.reserveCapacity( Whisper.kWhisperNumSamplesInChunk )
 //        self.accruedAudioSamples.append(contentsOf: [Float](repeating: 0, count: 200))
@@ -54,17 +54,17 @@ public class Whisper {
             array[index] = NSNumber(value: value)
         }
 
-        let encoded = try encoderModel.prediction(audio_input:array).var_1373
-        return encoded
+//        let encoded = try encoderModel.prediction(audio_input:array).var_1373
+        return array
     }
     
     func decode(audioFeatures: MLMultiArray) throws {
         let sotToken = try MLMultiArray(shape: [1, 1], dataType: .float32)
         sotToken[0] = NSNumber(integerLiteral: 50258)
-        let decoded = try decoderModel.prediction(token_data: sotToken, audio_data: audioFeatures).var_2205
-        let confidence = (50259...50357).map { decoded[$0].floatValue }
-        let (langIdx, _) = confidence.enumerated().max { $0.element < $1.element }!
-        print(Self.LANGUAGES[langIdx])
+//        let decoded = try decoderModel.prediction(token_data: sotToken, audio_data: audioFeatures).var_2205
+//        let confidence = (50259...50357).map { decoded[$0].floatValue }
+//        let (langIdx, _) = confidence.enumerated().max { $0.element < $1.element }!
+//        print(Self.LANGUAGES[langIdx])
     }
     
     
@@ -84,40 +84,53 @@ public class Whisper {
         // Determine the number of samples we need from our audio
         
         let numAvailableSamples = Int( CMSampleBufferGetNumSamples(sampleBuffer) )
-        
+
         // Calculate the number of samples we have to acrrue to get a full chunk
         let remainingSampleCount = Whisper.kWhisperNumSamplesInChunk - self.accruedAudioSamples.count;
         
         let samplesToAccrue = min(numAvailableSamples, remainingSampleCount);
         
         let remainingCurrentSamplesInBuffer = numAvailableSamples - samplesToAccrue;
+        
+        print("numAvailableSamples", numAvailableSamples, "samplesToAccrue", samplesToAccrue, "remainingSampleCount", remainingSampleCount)
+        
                         
         for (buffer) in audioBufferList.convert()
         {
             let floatArray:[Float] = buffer.convert()
                 
-             let samplesWeNeedToAccrueForAProperChunk = floatArray[0 ... samplesToAccrue]
+            let samplesWeNeedToAccrueForAProperChunk = floatArray[0 ... samplesToAccrue - 1]
             
             self.accruedAudioSamples.insert(contentsOf: samplesWeNeedToAccrueForAProperChunk, at: self.numOfAccruedAudioSamples)
                 
             self.numOfAccruedAudioSamples = self.numOfAccruedAudioSamples + samplesWeNeedToAccrueForAProperChunk.count
+            
+            if (self.accruedAudioSamples.count == Whisper.kWhisperNumSamplesInChunk)
+            {
+                
+                print("Sending Chunk to Mel")
+    //            self.accruedAudioSamples.append(contentsOf: [Float](repeating: 0, count: 200))
+                
+                // send to Mel
+                self.mel.processData(values: self.accruedAudioSamples)
+                
+                
+                self.accruedAudioSamples = []
+                self.numOfAccruedAudioSamples = 0
+            }
+            
+            
+            if (remainingCurrentSamplesInBuffer > 0)
+            {
+                // Accrue whatever remainder we have..
+                print("Accrue")
+            }
         }
     
         
-        if (self.accruedAudioSamples.count == Whisper.kWhisperNumSamplesInChunk)
-        {
-            
-            print("Sending Chunk to Mel")
-//            self.accruedAudioSamples.append(contentsOf: [Float](repeating: 0, count: 200))
-            
-            // send to Mel
-            self.mel.processData(values: self.accruedAudioSamples)
-            
-            
-            self.accruedAudioSamples = []
-            self.numOfAccruedAudioSamples = 0
-        }
+   
         
+
     }
     
     
