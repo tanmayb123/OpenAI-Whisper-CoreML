@@ -17,6 +17,7 @@
 		1B6A59DC29635145004C510D /* decoder.mlpackage in Sources */ = {isa = PBXBuildFile; fileRef = 1B6A59DA29635145004C510D /* decoder.mlpackage */; };
 		1B6A59DD29635145004C510D /* encoder.mlpackage in Sources */ = {isa = PBXBuildFile; fileRef = 1B6A59DB29635145004C510D /* encoder.mlpackage */; };
 		1B6A59DF2963A1A6004C510D /* mel_filters.data in Resources */ = {isa = PBXBuildFile; fileRef = 1B6A59DE2963A1A6004C510D /* mel_filters.data */; };
+		1B6A59E12963A670004C510D /* AudioLoader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1B6A59E02963A670004C510D /* AudioLoader.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -33,6 +34,7 @@
 		1B6A59DA29635145004C510D /* decoder.mlpackage */ = {isa = PBXFileReference; lastKnownFileType = folder.mlpackage; path = decoder.mlpackage; sourceTree = "<group>"; };
 		1B6A59DB29635145004C510D /* encoder.mlpackage */ = {isa = PBXFileReference; lastKnownFileType = folder.mlpackage; path = encoder.mlpackage; sourceTree = "<group>"; };
 		1B6A59DE2963A1A6004C510D /* mel_filters.data */ = {isa = PBXFileReference; lastKnownFileType = file; path = mel_filters.data; sourceTree = "<group>"; };
+		1B6A59E02963A670004C510D /* AudioLoader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioLoader.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -72,6 +74,7 @@
 				01AF991E28E2A97E002DAC53 /* Whisper.swift */,
 				1B6A59D829634F2A004C510D /* MelSpectrogram.swift */,
 				01AF992428E2D90F002DAC53 /* AudioRecorder.swift */,
+				1B6A59E02963A670004C510D /* AudioLoader.swift */,
 				01AF98FA28E28BF2002DAC53 /* ContentView.swift */,
 				1B6A59DA29635145004C510D /* decoder.mlpackage */,
 				1B6A59DB29635145004C510D /* encoder.mlpackage */,
@@ -173,6 +176,7 @@
 				1B6A59DC29635145004C510D /* decoder.mlpackage in Sources */,
 				1B6A59D929634F2A004C510D /* MelSpectrogram.swift in Sources */,
 				01AF98F928E28BF2002DAC53 /* WhisperApp.swift in Sources */,
+				1B6A59E12963A670004C510D /* AudioLoader.swift in Sources */,
 				1B6A59DD29635145004C510D /* encoder.mlpackage in Sources */,
 				01AF991F28E2A97E002DAC53 /* Whisper.swift in Sources */,
 			);
