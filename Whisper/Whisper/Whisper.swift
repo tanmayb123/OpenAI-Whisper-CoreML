@@ -40,8 +40,8 @@ public class Whisper {
         self.decoderModel = try decoder(configuration: config)
         self.encoderModel = try encoder(configuration: config)
         
-        self.accruedAudioSamples.reserveCapacity( Whisper.kWhisperNumSamplesInChunk + 400)
-        self.accruedAudioSamples.append(contentsOf: [Float](repeating: 0, count: 200))
+        self.accruedAudioSamples.reserveCapacity( Whisper.kWhisperNumSamplesInChunk )
+//        self.accruedAudioSamples.append(contentsOf: [Float](repeating: 0, count: 200))
     }
     
     func encode(audio: [Float]) throws -> MLMultiArray {
@@ -88,28 +88,34 @@ public class Whisper {
         // Calculate the number of samples we have to acrrue to get a full chunk
         let remainingSampleCount = Whisper.kWhisperNumSamplesInChunk - self.accruedAudioSamples.count;
         
-        let samplesToAccrue = min(numAvailableSamples, numAvailableSamples);
+        let samplesToAccrue = min(numAvailableSamples, remainingSampleCount);
         
         let remainingCurrentSamplesInBuffer = numAvailableSamples - samplesToAccrue;
-                
-        let numberOfBuffers = audioBufferList.mNumberBuffers
-        
+                        
         for (buffer) in audioBufferList.convert()
         {
             let floatArray:[Float] = buffer.convert()
                 
-            self.accruedAudioSamples.insert(contentsOf: floatArray, at: self.numOfAccruedAudioSamples + 200)
+             let samplesWeNeedToAccrueForAProperChunk = floatArray[0 ... samplesToAccrue]
+            
+            self.accruedAudioSamples.insert(contentsOf: samplesWeNeedToAccrueForAProperChunk, at: self.numOfAccruedAudioSamples)
                 
-            self.numOfAccruedAudioSamples = self.numOfAccruedAudioSamples + floatArray.count
+            self.numOfAccruedAudioSamples = self.numOfAccruedAudioSamples + samplesWeNeedToAccrueForAProperChunk.count
         }
     
         
         if (self.accruedAudioSamples.count == Whisper.kWhisperNumSamplesInChunk)
         {
-            self.accruedAudioSamples.append(contentsOf: [Float](repeating: 0, count: 200))
+            
+            print("Sending Chunk to Mel")
+//            self.accruedAudioSamples.append(contentsOf: [Float](repeating: 0, count: 200))
             
             // send to Mel
-        
+            self.mel.processData(values: self.accruedAudioSamples)
+            
+            
+            self.accruedAudioSamples = []
+            self.numOfAccruedAudioSamples = 0
         }
         
     }
