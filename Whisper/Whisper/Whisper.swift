@@ -30,7 +30,7 @@ public class Whisper {
 
     // a chunk of audio samples, we decode that amount from some input
     // it seems like we pad by 200 in the beginning and end?
-    var accruedAudioSamples:[Float] = [Float](repeating: 0, count: Whisper.kWhisperNumSamplesInChunk + 400)
+    var accruedAudioSamples:[Float] = []
     var numOfAccruedAudioSamples:Int = 0
     
     init() throws {
@@ -39,6 +39,9 @@ public class Whisper {
         
         self.decoderModel = try decoder(configuration: config)
         self.encoderModel = try encoder(configuration: config)
+        
+        self.accruedAudioSamples.reserveCapacity( Whisper.kWhisperNumSamplesInChunk + 400)
+        self.accruedAudioSamples.append(contentsOf: [Float](repeating: 0, count: 200))
     }
     
     func encode(audio: [Float]) throws -> MLMultiArray {
@@ -68,19 +71,19 @@ public class Whisper {
     // this function accrues
     func accrueSamplesFromSampleBuffer(sampleBuffer:CMSampleBuffer)
     {
-        let audioBufferListSize:Int = 0
+        var audioBufferListSize:Int = 0
         
-        CMSampleBufferGetAudioBufferListWithRetainedBlockBuffer(sampleBuffer, bufferListSizeNeededOut: nil, bufferListOut: nil, bufferListSize:audioBufferListSize, blockBufferAllocator: nil, blockBufferMemoryAllocator: nil, flags: kCMSampleBufferFlag_AudioBufferList_Assure16ByteAlignment, blockBufferOut: nil)
+        CMSampleBufferGetAudioBufferListWithRetainedBlockBuffer(sampleBuffer, bufferListSizeNeededOut: &audioBufferListSize, bufferListOut: nil, bufferListSize:0, blockBufferAllocator: kCFAllocatorDefault, blockBufferMemoryAllocator: kCFAllocatorDefault, flags: kCMSampleBufferFlag_AudioBufferList_Assure16ByteAlignment, blockBufferOut: nil)
         
-        let unsafeAudioBufferList:UnsafeMutablePointer<AudioBufferList>? = nil
+        var audioBufferList = AudioBufferList(mNumberBuffers: 1, mBuffers: AudioBuffer(mNumberChannels: 1, mDataByteSize: UInt32(audioBufferListSize), mData: nil))
+
+        var blockBuffer:CMBlockBuffer?
         
-        let unsafeBlockBuffer:UnsafeMutablePointer<CMBlockBuffer?>? = nil
-        
-        CMSampleBufferGetAudioBufferListWithRetainedBlockBuffer(sampleBuffer, bufferListSizeNeededOut: nil, bufferListOut: unsafeAudioBufferList, bufferListSize: audioBufferListSize, blockBufferAllocator: nil, blockBufferMemoryAllocator: nil, flags: kCMSampleBufferFlag_AudioBufferList_Assure16ByteAlignment, blockBufferOut: unsafeBlockBuffer)
+        CMSampleBufferGetAudioBufferListWithRetainedBlockBuffer(sampleBuffer, bufferListSizeNeededOut: nil, bufferListOut: &audioBufferList, bufferListSize: audioBufferListSize, blockBufferAllocator: kCFAllocatorDefault, blockBufferMemoryAllocator: kCFAllocatorDefault, flags: kCMSampleBufferFlag_AudioBufferList_Assure16ByteAlignment, blockBufferOut: &blockBuffer)
         
         // Determine the number of samples we need from our audio
         
-        let numAvailableSamples = CMSampleBufferGetNumSamples(sampleBuffer)
+        let numAvailableSamples = Int( CMSampleBufferGetNumSamples(sampleBuffer) )
         
         // Calculate the number of samples we have to acrrue to get a full chunk
         let remainingSampleCount = Whisper.kWhisperNumSamplesInChunk - self.accruedAudioSamples.count;
@@ -88,35 +91,27 @@ public class Whisper {
         let samplesToAccrue = min(numAvailableSamples, numAvailableSamples);
         
         let remainingCurrentSamplesInBuffer = numAvailableSamples - samplesToAccrue;
-        
-        guard let audioBufferList = unsafeAudioBufferList?.pointee else {
-            print("could not get audioBufferList from Sample Buffer - bailing on this sample")
-            return
-        }
-        
+                
         let numberOfBuffers = audioBufferList.mNumberBuffers
         
-        for _ in 0 ... numberOfBuffers
+        for (buffer) in audioBufferList.convert()
         {
-            let channelData:(AudioBuffer) = audioBufferList.mBuffers
-            
-            for (i) in 0 ... channelData.mNumberChannels
-            {
-                guard let floatArray = channelData.mData?.bindMemory(to: [[Float]].self, capacity: Int(channelData.mDataByteSize)).pointee else
-                {
-                    print("unable to get audioBufferList Channel Data - bailing")
-                    break
-                }
+            let floatArray:[Float] = buffer.convert()
                 
-                let ithChannelOfSamples:[Float] = floatArray[Int(i)]
+            self.accruedAudioSamples.insert(contentsOf: floatArray, at: self.numOfAccruedAudioSamples + 200)
                 
-                self.accruedAudioSamples.insert(contentsOf: ithChannelOfSamples, at: self.numOfAccruedAudioSamples + 200)
-                
-                self.numOfAccruedAudioSamples = self.numOfAccruedAudioSamples + samplesToAccrue
-                
-            }
+            self.numOfAccruedAudioSamples = self.numOfAccruedAudioSamples + floatArray.count
         }
     
+        
+        if (self.accruedAudioSamples.count == Whisper.kWhisperNumSamplesInChunk)
+        {
+            self.accruedAudioSamples.append(contentsOf: [Float](repeating: 0, count: 200))
+            
+            // send to Mel
+        
+        }
+        
     }
     
     
@@ -199,4 +194,26 @@ public class Whisper {
         }
     }
     
+}
+
+
+// Taken from : https://gist.github.com/tion-low/47e9fc4082717078dff4d6259b6ffbc9
+
+extension AudioBufferList {
+    public mutating func convert() -> [AudioBuffer] {
+        let buf: UnsafeBufferPointer<AudioBuffer> = UnsafeBufferPointer<AudioBuffer>(start: &(self.mBuffers), count: Int(self.mNumberBuffers))
+        return Array(buf)
+    }
+}
+
+extension AudioBuffer {
+    public func convert() -> [Float] {
+        if let mdata = self.mData {
+            let ump = mdata.bindMemory(to: Float.self, capacity: Int(mDataByteSize))
+            let usp = UnsafeBufferPointer(start: ump, count: Int(mDataByteSize) / MemoryLayout<Float>.size)
+            return [Float](usp)
+        } else {
+            return []
+        }
+    }
 }
