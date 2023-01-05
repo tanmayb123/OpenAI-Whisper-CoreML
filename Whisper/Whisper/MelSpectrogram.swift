@@ -14,6 +14,7 @@ import Accelerate
 /*
   window = torch.hann_window(N_FFT).to(audio.device)
   stft = torch.stft(audio, N_FFT, HOP_LENGTH, window=window, return_complex=True)
+ 
   magnitudes = stft[:, :-1].abs() ** 2
 
   filters = mel_filters(audio.device, n_mels)
@@ -22,6 +23,13 @@ import Accelerate
   log_spec = torch.clamp(mel_spec, min=1e-10).log10()
   log_spec = torch.maximum(log_spec, log_spec.max() - 8.0)
   log_spec = (log_spec + 4.0) / 4.0
+ 
+ stft torch.Size([201, 3001])
+ magnitudes torch.Size([201, 3000])
+ mel filters torch.Size([80, 201])
+ mel spec torch.Size([80, 3000])
+ log spec torch.Size([80, 3000])
+ 
  */
 
 // https://pytorch.org/docs/stable/generated/torch.stft.html
@@ -140,7 +148,7 @@ public class MelSpectrogram
         audio.append(contentsOf: [Float](repeating: 0, count: self.numFFT/2))
 
         // we make
-        for (i) in 0 ..< self.melSampleCount
+        for (i) in 0 ..< self.melFilterBankCount
         {
             print("working on mel sample", i)
             // Slice numFFTs every hop count (barf) and make a mel spectrum out of it
