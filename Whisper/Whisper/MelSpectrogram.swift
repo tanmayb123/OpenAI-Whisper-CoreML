@@ -49,12 +49,12 @@ public class MelSpectrogram
     
     // a 3000 x 201 array - we compute 201 complex numbers for each STFT we compute
     // this is transposed to 201 x 3000 and matix multiplies by our 80 x 201 mel filter matrix
-    //var complexSpectrumValues:[[Complex<Float>]]
+    var complexSTFTMatrix:[[DSPComplex]]
 
-    /// A matrix of `filterBankCount` rows and `sampleCount` that contains the triangular overlapping
-    /// windows for each mel frequency.
-    var melFilterBank:UnsafeMutableBufferPointer<Float>
-
+    /// windows for each mel frequency
+    /// Our 80 x 201 sized matrix of 16080 float values of precomputed filters.
+    var melFilterMatrix:[[Float]]
+    
     /// Tthe width of the spectrogram.
     var melSampleCount:Int = 3000
     
@@ -139,7 +139,9 @@ public class MelSpectrogram
             return fft
         }()
         
-        self.melFilterBank = MelSpectrogram.makeFilterBankWithNumpyData()
+        self.melFilterMatrix = [[Float]]() // = MelSpectrogram.makeFilterBankWithNumpyData()
+        
+        self.complexSTFTMatrix = [[DSPComplex]](repeating: [DSPComplex](repeating: DSPComplex(), count: self.numFFT/2), count: self.melSampleCount + 1)
     }
     
     func processData(audio: [Float])
@@ -153,9 +155,9 @@ public class MelSpectrogram
 
         // we need to create 201 x 3001 matrix of STFTs - note we appear to want to output complex numbers (?)
         
-        for (i) in 0 ..< self.melSampleCount
+        for (i) in 0 ... self.melSampleCount
         {
-            print("working on mel sample", i)
+//            print("working on mel sample", i)
             // Slice numFFTs every hop count (barf) and make a mel spectrum out of it
             self.timeDomainValues = Array<Float>( audio[ (i * self.hopCount) ..< ( (i * self.hopCount) + self.numFFT) ] )
 
@@ -167,18 +169,19 @@ public class MelSpectrogram
                                    temporaryImaginaryBuffer: &self.imaginaryParts)
             
             vDSP.absolute(frequencyDomainBuffer, result: &frequencyDomainBuffer)
-            print("Our Frequencey Domain buffer is now", frequencyDomainBuffer.count)
+//            print("Our Frequencey Domain buffer is now", frequencyDomainBuffer.count)
            
-            var complexMatrix = [DSPComplex](repeating: DSPComplex(real: 0, imag: 0), count: 200)
+            // this is one column out of 3000 for our matrix
+            var complexArray = [DSPComplex](repeating: DSPComplex(real: 0, imag: 0), count: 200)
 
-            // Set up the split complex vector
+            // Set up the split complex vector for the current column in the matrix
             let realCount = self.realParts.count
             self.realParts.withUnsafeMutableBufferPointer { realPtr in
                 self.imaginaryParts.withUnsafeMutableBufferPointer { imagPtr in
                     var splitComplex = DSPSplitComplex(realp: realPtr.baseAddress!,
                                                        imagp: imagPtr.baseAddress!)
 
-                    complexMatrix.withUnsafeMutableBytes { complexMatrixUnsafe in
+                    complexArray.withUnsafeMutableBytes { complexMatrixUnsafe in
                         vDSP_ztoc(&splitComplex, 1,
                                   complexMatrixUnsafe.bindMemory(to: DSPComplex.self).baseAddress!, 2,
                                   vDSP_Length(realCount))
@@ -187,42 +190,42 @@ public class MelSpectrogram
             }
             
 //            vDSP.absolute(complexMatrix, result: &complexMatrix)
-            print("Our complex buffer is now", complexMatrix.count)
-
+//            print("Our complex buffer is now", complexArray.count)
+            self.complexSTFTMatrix[i] = complexArray
         }
         
         
+        return
         
-        
-        self.frequencyDomainBuffer.withUnsafeBufferPointer { frequencyDomainValuesPtr in
-            
-            self.melFilterBank.withUnsafeBufferPointer { melFilterBankValuesPtr in
-
-                // cache the result of our count prior
-                let sgemmResultCount = sgemmResult.count;
-                self.sgemmResult.withUnsafeMutableBufferPointer { sgemmResultValuesPtr in
-                    
-                    // Multiplies our filter bank and our frequencyDomainBuffer
-                    cblas_sgemm(CblasRowMajor,
-                                CblasTrans, CblasTrans,
-                                Int32(1),
-                                Int32(self.melFilterBankCount),
-                                Int32(self.melSampleCount),
-                                1,
-                                frequencyDomainValuesPtr.baseAddress, Int32(1),
-                                melFilterBankValuesPtr.baseAddress, Int32(self.melSampleCount),
-                                0,
-                                sgemmResultValuesPtr.baseAddress, Int32(self.melFilterBankCount))
-                    
-                    // Converts single-precision power or amplitude values to decibel values.
-                    vDSP_vdbcon(sgemmResultValuesPtr.baseAddress!, 1,
-                                [20_000],
-                                sgemmResultValuesPtr.baseAddress!, 1,
-                                vDSP_Length(sgemmResultCount),
-                                0)
-                }
-            }
-        }
+//        self.frequencyDomainBuffer.withUnsafeBufferPointer { frequencyDomainValuesPtr in
+//
+//            self.melFilterMatrix.withUnsafeBufferPointer { melFilterBankValuesPtr in
+//
+//                // cache the result of our count prior
+//                let sgemmResultCount = sgemmResult.count;
+//                self.sgemmResult.withUnsafeMutableBufferPointer { sgemmResultValuesPtr in
+//
+//                    // Multiplies our filter bank and our frequencyDomainBuffer
+//                    cblas_sgemm(CblasRowMajor,
+//                                CblasTrans, CblasTrans,
+//                                Int32(1),
+//                                Int32(self.melFilterBankCount),
+//                                Int32(self.melSampleCount),
+//                                1,
+//                                frequencyDomainValuesPtr.baseAddress, Int32(1),
+//                                melFilterBankValuesPtr.baseAddress, Int32(self.melSampleCount),
+//                                0,
+//                                sgemmResultValuesPtr.baseAddress, Int32(self.melFilterBankCount))
+//
+//                    // Converts single-precision power or amplitude values to decibel values.
+//                    vDSP_vdbcon(sgemmResultValuesPtr.baseAddress!, 1,
+//                                [20_000],
+//                                sgemmResultValuesPtr.baseAddress!, 1,
+//                                vDSP_Length(sgemmResultCount),
+//                                0)
+//                }
+//            }
+//        }
        
 //        melSpectrumValues.append(contentsOf: sgemmResult)
         
