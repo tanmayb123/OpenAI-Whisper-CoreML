@@ -24,9 +24,10 @@ public class Whisper {
     
     static let LANGUAGES = ["en", "zh", "de", "es", "ru", "ko", "fr", "ja", "pt", "tr", "pl", "ca", "nl", "ar", "sv", "it", "id", "hi", "fi", "vi", "iw", "uk", "el", "ms", "cs", "ro", "da", "hu", "ta", "no", "th", "ur", "hr", "bg", "lt", "la", "mi", "ml", "cy", "sk", "te", "fa", "lv", "bn", "sr", "az", "sl", "kn", "et", "mk", "br", "eu", "is", "hy", "ne", "mn", "bs", "kk", "sq", "sw", "gl", "mr", "pa", "si", "km", "sn", "yo", "so", "af", "oc", "ka", "be", "tg", "sd", "gu", "am", "yi", "lo", "uz", "fo", "ht", "ps", "tk", "nn", "mt", "sa", "lb", "my", "bo", "tl", "mg", "as", "tt", "haw", "ln", "ha", "ba", "jw", "su"]
     
-//    let decoderModel: decoder
-//    let encoderModel: encoder
-    let mel:MelSpectrogram = MelSpectrogram()
+    let decoderModel: decoder
+    let encoderModel: encoder
+    
+    let mel:MelSpectrogram = MelSpectrogram(sampleCount: kWhisperNumSamplesInChunk, hopCount: kWhisperHopLength, melCount: kWhisperNumMels, numFFT: kWhisperNumFFTs)
 
     // a chunk of audio samples, we decode that amount from some input
     // it seems like we pad by 200 in the beginning and end?
@@ -37,34 +38,34 @@ public class Whisper {
         let config = MLModelConfiguration()
         config.computeUnits = .all
         
-//        self.decoderModel = try decoder(configuration: config)
-//        self.encoderModel = try encoder(configuration: config)
+        self.decoderModel = try decoder(configuration: config)
+        self.encoderModel = try encoder(configuration: config)
         
         self.accruedAudioSamples.reserveCapacity( Whisper.kWhisperNumSamplesInChunk )
 //        self.accruedAudioSamples.append(contentsOf: [Float](repeating: 0, count: 200))
     }
     
     func encode(audio: [Float]) throws -> MLMultiArray {
-        mel.processData(values: audio)
+        mel.processData(audio: audio)
 
         let spec = mel.melSpectrumValues
         let array = try MLMultiArray(shape: [1, 80, 3000], dataType: .float32)
 
-        for (index, value) in spec.enumerated() {
-            array[index] = NSNumber(value: value)
-        }
+//        for (index, value) in spec.enumerated() {
+//            array[index] = NSNumber(value: value)
+//        }
 
-//        let encoded = try encoderModel.prediction(audio_input:array).var_1373
-        return array
+        let encoded = try encoderModel.prediction(audio_input:array).var_1373
+        return encoded
     }
     
     func decode(audioFeatures: MLMultiArray) throws {
         let sotToken = try MLMultiArray(shape: [1, 1], dataType: .float32)
         sotToken[0] = NSNumber(integerLiteral: 50258)
-//        let decoded = try decoderModel.prediction(token_data: sotToken, audio_data: audioFeatures).var_2205
-//        let confidence = (50259...50357).map { decoded[$0].floatValue }
-//        let (langIdx, _) = confidence.enumerated().max { $0.element < $1.element }!
-//        print(Self.LANGUAGES[langIdx])
+        let decoded = try decoderModel.prediction(token_data: sotToken, audio_data: audioFeatures).var_2205
+        let confidence = (50259...50357).map { decoded[$0].floatValue }
+        let (langIdx, _) = confidence.enumerated().max { $0.element < $1.element }!
+        print(Self.LANGUAGES[langIdx])
     }
     
     
@@ -109,12 +110,15 @@ public class Whisper {
             {
                 
                 print("Sending Chunk to Mel")
-    //            self.accruedAudioSamples.append(contentsOf: [Float](repeating: 0, count: 200))
                 
-                // send to Mel
-                self.mel.processData(values: self.accruedAudioSamples)
-                
-                
+                do {
+                    let encoded = try self.encode(audio: self.accruedAudioSamples)
+                    try self.decode(audioFeatures: encoded)
+                }
+                catch let error
+                {
+                    
+                }
                 self.accruedAudioSamples = []
                 self.numOfAccruedAudioSamples = 0
             }
