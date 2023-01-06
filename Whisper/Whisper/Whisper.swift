@@ -127,13 +127,9 @@ public class Whisper {
             if (remainingCurrentSamplesInBuffer > 0)
             {
                 // Accrue whatever remainder we have..
-                print("Accrue")
+                print("Remeber to Accrue left over samples")
             }
         }
-    
-        
-   
-        
 
     }
     
@@ -199,7 +195,7 @@ public class Whisper {
                 
             }
             
-            let processingTime = startTime - NSDate.timeIntervalSinceReferenceDate
+            let processingTime = NSDate.timeIntervalSinceReferenceDate - startTime
             
             print("Decode and Predict took", processingTime, "seconds")
             
