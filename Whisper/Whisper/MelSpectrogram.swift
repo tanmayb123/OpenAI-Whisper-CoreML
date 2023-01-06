@@ -93,10 +93,6 @@ public class MelSpectrogram
     /// audio data.
     var frequencyDomainBuffer:[Float]
 
-    /// A buffer that contains the matrix multiply result of the current frame of frequency domain values in
-    /// `frequencyDomainBuffer` multiplied by the `filterBank` matrix.
-    var sgemmResult:[Float] // UnsafeMutableBufferPointer<Float>
-
     /// The real parts of the time- and frequency-domain representations (the code performs DFT in-place)
     /// of the current frame of audio.
     var realParts:[Float]
@@ -124,9 +120,7 @@ public class MelSpectrogram
         
         self.timeDomainValues = [] //[Float](repeating: 0, count: self.melSampleCount)
         self.frequencyDomainBuffer = [Float](repeating: 0, count: self.numFFT)
-        
-        self.sgemmResult = [Float](repeating: 0, count: self.melSampleCount);//UnsafeMutableBufferPointer<Float>.allocate(capacity: self.melSampleCount)
-        
+                
         self.realParts = [Float](repeating: 0,count: self.numFFT / 2)
         self.imaginaryParts = [Float](repeating: 0,count: self.numFFT / 2)
         self.fftRealBuffer = [Float](repeating: 0, count: self.numFFT / 2)
@@ -158,7 +152,6 @@ public class MelSpectrogram
         audio.append(contentsOf: [Float](repeating: 0, count: self.numFFT/2))
         
         // we need to create 201 x 3000 matrix of STFTs - note we appear to want to output complex numbers (?)
-        
         for (i) in 0 ..< self.melSampleCount
         {
             // Slice numFFTs every hop count (barf) and make a mel spectrum out of it
@@ -183,13 +176,6 @@ public class MelSpectrogram
         
         let matrix = [DSPSplitComplex](repeating: DSPSplitComplex(realp: UnsafeMutablePointer(mutating:flattnedReal), imagp: UnsafeMutablePointer(mutating:flattnedImaginary) ), count: flattnedReal.count)
         
-//        let matrix:[DSPSplitComplex] = zip(flattnedReal, flattnedImaginary).map { real, imaginary in
-//
-//            DSPSplitComplex(realp: real.withUnsafeMutableBufferPointer { $0.baseAddress! },
-//                               imagp: imaginary.withUnsafeMutableBufferPointer { $0.baseAddress! })
-//
-//        }
-//
         // Take the magnitude squared of the matrix, which results in a Result flat array of 3000 x 200 of real floats
         // Then multiply it with our mel filter bank
         let count = self.complexSTFTReal.count * self.complexSTFTReal[0].count
@@ -197,32 +183,42 @@ public class MelSpectrogram
         var melSpectroGram = [Float](repeating: 0, count: count)
         
         matrix.withUnsafeBufferPointer{ unsafeMatrixPtr in
-//            melSpectroGram.withUnsafeMutableBytes { unsafeMelBytes in
-//                self.melFilterMatrix.withUnsafeBytes { unsafeMelFilterBank in
-                    
                 // populate magnitude matrix with magnitudes squared
-                vDSP_zvmags(unsafeMatrixPtr.baseAddress!, 1, &magnitudes, 1, vDSP_Length(count))
+            vDSP_zvmags(unsafeMatrixPtr.baseAddress!, 1, &magnitudes, 1, vDSP_Length(count))
                 
-                // matrix multiply magitude squared matrix with our filter bank
-                cblas_sgemm(CblasRowMajor,
-                            CblasNoTrans,
-                            CblasNoTrans,
-                            Int32(self.melSampleCount),
-                            Int32(self.melFilterBankCount),
-                            Int32(200), // Size of Filter Bank
-                            1.0, // Alpha - no bias
-                            &magnitudes,
-                            Int32(200),
-                            &self.melFilterMatrix,
-                            Int32(201),
-                            0.0, // Beta - no offset
-                            &melSpectroGram,
-                            Int32(self.melFilterBankCount))
-//                }
-
-//            }
+            // MATRIX A mel filters is 80 rows x 201 columns
+            // MATRIX B magnitudes is 3000 x 200
+            // MATRIX B is TRANSPOSED to be 200 rows x 3000 columns
+            // MAtrix C melSpectroGram is 80 rows x 3000 columns
+            
+            
+            let M: Int32 = 80 // number of rows in matrix A
+            let N: Int32 = 3000 // number of columns in matrix B
+            let K: Int32 = 200 // number of columns in matrix A and number of rows in
+            // matrix multiply magitude squared matrix with our filter bank
+            cblas_sgemm(CblasRowMajor,
+                        CblasNoTrans,           // Transpose A
+                        CblasTrans,             // Transpose B magnitudes to be 200 x 3000
+                        M,                      // M Number of rows in matrices A and C.
+                        N,            // N Number of columns in matrices B and C.
+                        K,             // K Number of columns in matrix A; number of rows in matrix B.
+                        1,                      // Alpha Scaling factor for the product of matrices A and B.
+                        &self.melFilterMatrix,  // Matrix A
+                        K,              // LDA The size of the first dimension of matrix A; if you are passing a matrix A[m][n], the value should be m.
+                        &magnitudes,            // Matrix B
+                        N,             // LDB The size of the first dimension of matrix B; if you are passing a matrix B[m][n], the value should be m.
+                        0,                      // Beta Scaling factor for matrix C.
+                        &melSpectroGram,        // Matrix C
+                        N)              // LDC The size of the first dimension of matrix C; if you are passing a matrix C[m][n], the value should be m.
+                        
         }
         
+        // WHen LDA is 80
+
+        // lda must be >= MAX(K,1): lda=80 K=200.ldc must be >= MAX(N,1): ldc=80 N=3000. BLAS error: Parameter number 9 passed to cblas_sgemm had an invalid value
+//        ldc must be >= MAX(N,1): ldc=80 N=3000. BLAS error: Parameter number 14 passed to cblas_sgemm had an invalid value
+
+        //A045_C001_0603BW_analyzed
     
 //        melSpectroGram = melSpectroGram.chunked(into: <#T##Int#>)
             
@@ -305,39 +301,18 @@ public class MelSpectrogram
 
 
     static func makeFilterBankWithNumpyData() -> [Float] {
-        let numpyFloatArrayLength = 16080
+//        let numpyFloatArrayLength = 16080
         let fileURL = Bundle.main.url(forResource: "mel_filters", withExtension:"data")
         let fileHandle = try! FileHandle(forReadingFrom: fileURL!)
 
         let floatData = fileHandle.readDataToEndOfFile()
         let floatArray = floatData.withUnsafeBytes { unsafeFloatArray in
             return Array(UnsafeBufferPointer<Float>(start: unsafeFloatArray.bindMemory(to: Float.self).baseAddress!, count: floatData.count / MemoryLayout<Float>.stride) )
-//            return Array(UnsafeBufferPointer<Float>(start: unsafeFloatArray.baseAddress!, count: floatData.count / MemoryLayout<Float>.stride))
         }
 
         return floatArray;
-//        return  floatArray.chunked(into: withChunk)
 
-//        let floatBytes = UnsafeMutableBufferPointer<Float>.allocate(capacity:numpyFloatArrayLength)
-//
-//        do
-//        {
-//            let url = Bundle.main.url(forResource: "mel_filters", withExtension:"data")
-//
-//            let numpyData = try Data(contentsOf: url!, options: [])
-//
-//            _ = numpyData.copyBytes(to: floatBytes)
-//
-//        }
-//        catch
-//        {
-//
-//        }
-//
-//        return floatBytes
     }
-    
-    
 }
 
 extension Array {
