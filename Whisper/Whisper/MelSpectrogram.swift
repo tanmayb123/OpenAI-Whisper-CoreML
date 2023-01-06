@@ -6,9 +6,7 @@
 //
 import Accelerate
 
-
-
-// Look at
+// Reference implementation we are attempting to match
 // https://github.com/openai/whisper/blob/main/whisper/audio.py#L92
 /*
   window = torch.hann_window(N_FFT).to(audio.device)
@@ -34,9 +32,13 @@ import Accelerate
 // https://pytorch.org/docs/stable/generated/torch.stft.html
 // https://github.com/pytorch/pytorch/blob/master/aten/src/ATen/native/SpectralOps.cpp#L820
 
+// Some notes
+// We do not calculate a 3001 mel, we skip the last since it wont be used anyway and is dropped later, saving 1/3000th of work.
+//
 
 
-// alternatively http://www.ml-illustrated.com/2020/06/01/deploy-pytorch-model-with-coreml-convert-issues.html
+// alternatively
+// http://www.ml-illustrated.com/2020/06/01/deploy-pytorch-model-with-coreml-convert-issues.html
 // and https://github.com/ml-illustrated/Pytorch-CoreML-Spectrogram/blob/d0dd6c55eaf5fdcfaf00b1f036b258bd144b1ac4/python/model.py#L142
 
 public class MelSpectrogram
@@ -46,13 +48,15 @@ public class MelSpectrogram
     /// An 2D  array that contains the entire spectrogram, 80 x 3000
     var melSpectrumValues:[[Float]]
     
-    // a 3000 x 201 array - we compute 201 complex numbers for each STFT we compute
-    // this is transposed to 201 x 3000 and matix multiplies by our 80 x 201 mel filter matrix
-    var complexSTFTMatrix:[[DSPComplex]]
-
+    /// a 3000 x 201 array - we compute 201 complex numbers for each STFT we compute
+    /// this is transposed to 201 x 3000 and matix multiplies by our 80 x 201 mel filter matrix
+    /// in order to optimize this, we split our array into real and imaginary components so we can  more easily use our
+    var complexSTFTReal:[[Float]]
+    var complexSTFTImaginary:[[Float]]
+ 
     /// windows for each mel frequency
     /// Our 80 x 201 sized matrix of 16080 float values of precomputed filters.
-    var melFilterMatrix:[[Float]]
+    var melFilterMatrix:[Float]
     
     /// Tthe width of the spectrogram.
     var melSampleCount:Int = 3000
@@ -138,28 +142,28 @@ public class MelSpectrogram
             return fft
         }()
         
-        self.melFilterMatrix = [[Float]]() // = MelSpectrogram.makeFilterBankWithNumpyData()
+        self.melFilterMatrix = MelSpectrogram.makeFilterBankWithNumpyData()
         
-        self.complexSTFTMatrix = [[DSPComplex]](repeating: [DSPComplex](repeating: DSPComplex(), count: self.numFFT/2), count: self.melSampleCount + 1)
+        self.complexSTFTReal = [[Float]](repeating: [Float](repeating: 0, count: self.numFFT/2), count: self.melSampleCount)
+        self.complexSTFTImaginary = [[Float]](repeating: [Float](repeating: 0, count: self.numFFT/2), count: self.melSampleCount)
     }
     
-    func processData(audio: [Float])
+    func processData(audio: [Float]) -> [Float]
     {
         assert(self.sampleCount == audio.count)
-     
+        
         // insert numFFT/2 samples before and numFFT/2 after so we have a extra numFFT amount to process
         var audio = audio
         audio.insert(contentsOf: [Float](repeating: 0, count: self.numFFT/2), at: 0)
         audio.append(contentsOf: [Float](repeating: 0, count: self.numFFT/2))
-
-        // we need to create 201 x 3001 matrix of STFTs - note we appear to want to output complex numbers (?)
         
-        for (i) in 0 ... self.melSampleCount
+        // we need to create 201 x 3000 matrix of STFTs - note we appear to want to output complex numbers (?)
+        
+        for (i) in 0 ..< self.melSampleCount
         {
-//            print("working on mel sample", i)
             // Slice numFFTs every hop count (barf) and make a mel spectrum out of it
             self.timeDomainValues = Array<Float>( audio[ (i * self.hopCount) ..< ( (i * self.hopCount) + self.numFFT) ] )
-
+            
             assert(self.timeDomainValues.count == self.numFFT)
             
             self.performForwardDFT(timeDomainValues: &self.timeDomainValues,
@@ -168,78 +172,62 @@ public class MelSpectrogram
                                    temporaryImaginaryBuffer: &self.imaginaryParts)
             
             vDSP.absolute(frequencyDomainBuffer, result: &frequencyDomainBuffer)
-//            print("Our Frequencey Domain buffer is now", frequencyDomainBuffer.count)
-
-            let realCount = self.realParts.count
-
-            // this is one column out of 3000 for our matrix
-            var complexArray = [DSPComplex](repeating: DSPComplex(real: 0, imag: 0), count: realCount)
-
-            // Set up the split complex vector for the current column in the matrix
-            self.realParts.withUnsafeMutableBufferPointer { realPtr in
-                self.imaginaryParts.withUnsafeMutableBufferPointer { imagPtr in
-                    var splitComplex = DSPSplitComplex(realp: realPtr.baseAddress!,
-                                                       imagp: imagPtr.baseAddress!)
-
-                    complexArray.withUnsafeMutableBytes { complexMatrixUnsafe in
-                        vDSP_ztoc(&splitComplex, 1,
-                                  complexMatrixUnsafe.bindMemory(to: DSPComplex.self).baseAddress!, 2,
-                                  vDSP_Length(realCount))
-                    }
-                }
-            }
             
-            self.complexSTFTMatrix[i] = complexArray
+            self.complexSTFTReal[i] = self.realParts
+            self.complexSTFTImaginary[i] = self.imaginaryParts
         }
         
-        // Take the absolute value of the matrix
-        let count = self.complexSTFTMatrix.count * self.complexSTFTMatrix[0].count
-        var complexArray = self.complexSTFTMatrix.flatMap { $0 }
-        var magnitudeArray = [Float](repeating: 0, count: count)
-
-//        // compute the magnutide
-        complexArray.withUnsafeMutableBytes{ complexArrayUnsafe in
-            vDSP_zvmags(complexArrayUnsafe.bindMemory(to: DSPComplex.self).baseAddress!, 1, &magnitudeArray, 1, vDSP_Length(count))
-        }
-//
-//        // square
-//        vDSP_vsq(&splitComplex, 1, &splitComplex, 1, vDSP_Length(realCount))
+        // We create flattened  3000 x 200 array of DSPSplitComplex values
+        let flattnedReal:[Float] = self.complexSTFTReal.flatMap { $0 }
+        let flattnedImaginary:[Float] = self.complexSTFTImaginary.flatMap { $0 }
         
-
+        let matrix = [DSPSplitComplex](repeating: DSPSplitComplex(realp: UnsafeMutablePointer(mutating:flattnedReal), imagp: UnsafeMutablePointer(mutating:flattnedImaginary) ), count: flattnedReal.count)
         
-        return
-        
-//        self.frequencyDomainBuffer.withUnsafeBufferPointer { frequencyDomainValuesPtr in
+//        let matrix:[DSPSplitComplex] = zip(flattnedReal, flattnedImaginary).map { real, imaginary in
 //
-//            self.melFilterMatrix.withUnsafeBufferPointer { melFilterBankValuesPtr in
+//            DSPSplitComplex(realp: real.withUnsafeMutableBufferPointer { $0.baseAddress! },
+//                               imagp: imaginary.withUnsafeMutableBufferPointer { $0.baseAddress! })
 //
-//                // cache the result of our count prior
-//                let sgemmResultCount = sgemmResult.count;
-//                self.sgemmResult.withUnsafeMutableBufferPointer { sgemmResultValuesPtr in
-//
-//                    // Multiplies our filter bank and our frequencyDomainBuffer
-//                    cblas_sgemm(CblasRowMajor,
-//                                CblasTrans, CblasTrans,
-//                                Int32(1),
-//                                Int32(self.melFilterBankCount),
-//                                Int32(self.melSampleCount),
-//                                1,
-//                                frequencyDomainValuesPtr.baseAddress, Int32(1),
-//                                melFilterBankValuesPtr.baseAddress, Int32(self.melSampleCount),
-//                                0,
-//                                sgemmResultValuesPtr.baseAddress, Int32(self.melFilterBankCount))
-//
-//                    // Converts single-precision power or amplitude values to decibel values.
-//                    vDSP_vdbcon(sgemmResultValuesPtr.baseAddress!, 1,
-//                                [20_000],
-//                                sgemmResultValuesPtr.baseAddress!, 1,
-//                                vDSP_Length(sgemmResultCount),
-//                                0)
-//                }
-//            }
 //        }
-       
-//        melSpectrumValues.append(contentsOf: sgemmResult)
+//
+        // Take the magnitude squared of the matrix, which results in a Result flat array of 3000 x 200 of real floats
+        // Then multiply it with our mel filter bank
+        let count = self.complexSTFTReal.count * self.complexSTFTReal[0].count
+        var magnitudes = [Float](repeating: 0, count: count)
+        var melSpectroGram = [Float](repeating: 0, count: count)
+        
+        matrix.withUnsafeBufferPointer{ unsafeMatrixPtr in
+//            melSpectroGram.withUnsafeMutableBytes { unsafeMelBytes in
+//                self.melFilterMatrix.withUnsafeBytes { unsafeMelFilterBank in
+                    
+                // populate magnitude matrix with magnitudes squared
+                vDSP_zvmags(unsafeMatrixPtr.baseAddress!, 1, &magnitudes, 1, vDSP_Length(count))
+                
+                // matrix multiply magitude squared matrix with our filter bank
+                cblas_sgemm(CblasRowMajor,
+                            CblasNoTrans,
+                            CblasNoTrans,
+                            Int32(self.melSampleCount),
+                            Int32(self.melFilterBankCount),
+                            Int32(200), // Size of Filter Bank
+                            1.0, // Alpha - no bias
+                            &magnitudes,
+                            Int32(200),
+                            &self.melFilterMatrix,
+                            Int32(201),
+                            0.0, // Beta - no offset
+                            &melSpectroGram,
+                            Int32(self.melFilterBankCount))
+//                }
+
+//            }
+        }
+        
+    
+//        melSpectroGram = melSpectroGram.chunked(into: <#T##Int#>)
+            
+        return melSpectroGram // .chunked(into: 3000)
+        
         
     }
     
@@ -310,35 +298,52 @@ public class MelSpectrogram
 //        }
     }
 
-    func generateSpectrogram(audio: [Float]) -> [[Float]] {
+    func generateSpectrogram(audio: [Float]) -> [Float] {
         
-        processData(audio: audio)
-        
-        return melSpectrumValues
+        return processData(audio: audio)
     }
 
 
-    static func makeFilterBankWithNumpyData() -> UnsafeMutableBufferPointer<Float> {
+    static func makeFilterBankWithNumpyData() -> [Float] {
         let numpyFloatArrayLength = 16080
-        let floatBytes = UnsafeMutableBufferPointer<Float>.allocate(capacity:numpyFloatArrayLength)
-       
-        do
-        {
-            let url = Bundle.main.url(forResource: "mel_filters", withExtension:"data")
-            
-            let numpyData = try Data(contentsOf: url!, options: [])
-            
-            _ = numpyData.copyBytes(to: floatBytes)
-            
-        }
-        catch
-        {
-            
+        let fileURL = Bundle.main.url(forResource: "mel_filters", withExtension:"data")
+        let fileHandle = try! FileHandle(forReadingFrom: fileURL!)
+
+        let floatData = fileHandle.readDataToEndOfFile()
+        let floatArray = floatData.withUnsafeBytes { unsafeFloatArray in
+            return Array(UnsafeBufferPointer<Float>(start: unsafeFloatArray.bindMemory(to: Float.self).baseAddress!, count: floatData.count / MemoryLayout<Float>.stride) )
+//            return Array(UnsafeBufferPointer<Float>(start: unsafeFloatArray.baseAddress!, count: floatData.count / MemoryLayout<Float>.stride))
         }
 
-        return floatBytes
+        return floatArray;
+//        return  floatArray.chunked(into: withChunk)
+
+//        let floatBytes = UnsafeMutableBufferPointer<Float>.allocate(capacity:numpyFloatArrayLength)
+//
+//        do
+//        {
+//            let url = Bundle.main.url(forResource: "mel_filters", withExtension:"data")
+//
+//            let numpyData = try Data(contentsOf: url!, options: [])
+//
+//            _ = numpyData.copyBytes(to: floatBytes)
+//
+//        }
+//        catch
+//        {
+//
+//        }
+//
+//        return floatBytes
     }
     
     
 }
 
+extension Array {
+    func chunked(into size: Int) -> [[Element]] {
+        return stride(from: 0, to: count, by: size).map {
+            Array(self[$0 ..< Swift.min($0 + size, count)])
+        }
+    }
+}

@@ -46,14 +46,13 @@ public class Whisper {
     }
     
     func encode(audio: [Float]) throws -> MLMultiArray {
-        mel.processData(audio: audio)
+        let mel:[Float] = mel.processData(audio: audio)
 
-        let spec = mel.melSpectrumValues
         let array = try MLMultiArray(shape: [1, 80, 3000], dataType: .float32)
 
-//        for (index, value) in spec.enumerated() {
-//            array[index] = NSNumber(value: value)
-//        }
+        for (index, value) in mel.enumerated() {
+            array[index] = NSNumber(value: value)
+        }
 
         let encoded = try encoderModel.prediction(audio_input:array).var_1373
         return encoded
@@ -158,7 +157,7 @@ public class Whisper {
             ] as [String : Any]
             
             let audioOutput = AVAssetReaderAudioMixOutput(audioTracks: audioTracks, audioSettings: audioOutputSettings)
-            audioOutput.alwaysCopiesSampleData = false
+            audioOutput.alwaysCopiesSampleData = true
             
             if ( assetReader.canAdd(audioOutput) )
             {
