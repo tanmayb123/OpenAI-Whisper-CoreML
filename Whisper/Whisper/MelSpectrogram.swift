@@ -5,7 +5,6 @@
 //  Created by Tanmay Bakshi on 2022-09-26.
 //
 import Accelerate
-import Numerics
 
 
 
@@ -170,12 +169,13 @@ public class MelSpectrogram
             
             vDSP.absolute(frequencyDomainBuffer, result: &frequencyDomainBuffer)
 //            print("Our Frequencey Domain buffer is now", frequencyDomainBuffer.count)
-           
+
+            let realCount = self.realParts.count
+
             // this is one column out of 3000 for our matrix
-            var complexArray = [DSPComplex](repeating: DSPComplex(real: 0, imag: 0), count: 200)
+            var complexArray = [DSPComplex](repeating: DSPComplex(real: 0, imag: 0), count: realCount)
 
             // Set up the split complex vector for the current column in the matrix
-            let realCount = self.realParts.count
             self.realParts.withUnsafeMutableBufferPointer { realPtr in
                 self.imaginaryParts.withUnsafeMutableBufferPointer { imagPtr in
                     var splitComplex = DSPSplitComplex(realp: realPtr.baseAddress!,
@@ -189,11 +189,23 @@ public class MelSpectrogram
                 }
             }
             
-//            vDSP.absolute(complexMatrix, result: &complexMatrix)
-//            print("Our complex buffer is now", complexArray.count)
             self.complexSTFTMatrix[i] = complexArray
         }
         
+        // Take the absolute value of the matrix
+        let count = self.complexSTFTMatrix.count * self.complexSTFTMatrix[0].count
+        var complexArray = self.complexSTFTMatrix.flatMap { $0 }
+        var magnitudeArray = [Float](repeating: 0, count: count)
+
+//        // compute the magnutide
+        complexArray.withUnsafeMutableBytes{ complexArrayUnsafe in
+            vDSP_zvmags(complexArrayUnsafe.bindMemory(to: DSPComplex.self).baseAddress!, 1, &magnitudeArray, 1, vDSP_Length(count))
+        }
+//
+//        // square
+//        vDSP_vsq(&splitComplex, 1, &splitComplex, 1, vDSP_Length(realCount))
+        
+
         
         return
         
