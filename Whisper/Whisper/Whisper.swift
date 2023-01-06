@@ -56,6 +56,7 @@ public class Whisper {
 
         let encoded = try encoderModel.prediction(audio_input:array).var_1373
         return encoded
+//        return array
     }
     
     func decode(audioFeatures: MLMultiArray) throws {
@@ -92,7 +93,7 @@ public class Whisper {
         
         let remainingCurrentSamplesInBuffer = numAvailableSamples - samplesToAccrue;
         
-        print("numAvailableSamples", numAvailableSamples, "samplesToAccrue", samplesToAccrue, "remainingSampleCount", remainingSampleCount)
+//        print("numAvailableSamples", numAvailableSamples, "samplesToAccrue", samplesToAccrue, "remainingSampleCount", remainingSampleCount)
         
                         
         for (buffer) in audioBufferList.convert()
@@ -108,7 +109,7 @@ public class Whisper {
             if (self.accruedAudioSamples.count == Whisper.kWhisperNumSamplesInChunk)
             {
                 
-                print("Sending Chunk to Mel")
+//                print("Sending Chunk to Mel")
                 
                 do {
                     let encoded = try self.encode(audio: self.accruedAudioSamples)
