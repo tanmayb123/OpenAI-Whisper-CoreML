@@ -17,7 +17,7 @@ def convert_encoder_to_tvm(model):
     model = ct.convert(
         traced_model,
         convert_to="mlprogram",
-        inputs=[ct.TensorType(shape=input_shape)]
+        inputs=[ct.TensorType(name="logmel_data", shape=input_shape)]
     )
 
     return model
@@ -35,8 +35,8 @@ def convert_decoder_to_tvm(model):
         traced_model,
         convert_to="mlprogram",
         inputs=[
-            ct.TensorType(shape=tokens_shape, dtype=int),
-            ct.TensorType(shape=audio_shape)
+            ct.TensorType(name="token_data", shape=tokens_shape, dtype=int),
+            ct.TensorType(name="audio_data", shape=audio_shape)
         ]
     )
 
