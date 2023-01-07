@@ -22,10 +22,10 @@ public class Whisper {
     // exact_div(kWhisperNumSamplesInChunk, kWhisperHopLength)  # 3000: number of frames in a mel spectrogram input
     static let kWhisperNumSamplesInMel:Int = 3000; // frames of Mel spectrograms
     
-    static let LANGUAGES = ["en", "zh", "de", "es", "ru", "ko", "fr", "ja", "pt", "tr", "pl", "ca", "nl", "ar", "sv", "it", "id", "hi", "fi", "vi", "iw", "uk", "el", "ms", "cs", "ro", "da", "hu", "ta", "no", "th", "ur", "hr", "bg", "lt", "la", "mi", "ml", "cy", "sk", "te", "fa", "lv", "bn", "sr", "az", "sl", "kn", "et", "mk", "br", "eu", "is", "hy", "ne", "mn", "bs", "kk", "sq", "sw", "gl", "mr", "pa", "si", "km", "sn", "yo", "so", "af", "oc", "ka", "be", "tg", "sd", "gu", "am", "yi", "lo", "uz", "fo", "ht", "ps", "tk", "nn", "mt", "sa", "lb", "my", "bo", "tl", "mg", "as", "tt", "haw", "ln", "ha", "ba", "jw", "su"]
-    
+   
     let decoderModel: decoder
     let encoderModel: encoder
+    let tokenizer = WhisperTokenizer()
     
     let mel:MelSpectrogram = MelSpectrogram(sampleCount: kWhisperNumSamplesInChunk, hopCount: kWhisperHopLength, melCount: kWhisperNumMels, numFFT: kWhisperNumFFTs)
 
@@ -60,12 +60,35 @@ public class Whisper {
     }
     
     func decode(audioFeatures: MLMultiArray) throws {
-        let sotToken = try MLMultiArray(shape: [1, 1], dataType: .float32)
-        sotToken[0] = NSNumber(integerLiteral: 50258)
+        
+        // Start transcription with the SOT token
+        let sotToken = self.tokenizer.tokenToMultiArray(token: WhisperTokenizer.sotToken)
         let decoded = try decoderModel.prediction(token_data: sotToken, audio_data: audioFeatures).var_2205
-        let confidence = (50259...50357).map { decoded[$0].floatValue }
-        let (langIdx, _) = confidence.enumerated().max { $0.element < $1.element }!
-        print(Self.LANGUAGES[langIdx])
+        
+        var decodedTokens:[Int] = []
+        
+        var nextToken = self.tokenizer.nextTokenGreedy(decoded: decoded)
+        
+        decodedTokens.append(nextToken)
+        
+        while ( nextToken != WhisperTokenizer.eotToken )
+        {
+            print("Next Token:", nextToken)
+            let nextTokenArray = self.tokenizer.tokenToMultiArray(token: nextToken)
+
+            let decoded = try decoderModel.prediction(token_data: nextTokenArray, audio_data: audioFeatures).var_2205
+            
+            nextToken = self.tokenizer.nextTokenGreedy(decoded: decoded)
+            
+            decodedTokens.append(nextToken)
+
+            print(self.tokenizer.decode(tokens: decodedTokens))
+        }
+        
+        let transcription = self.tokenizer.decode(tokens: decodedTokens)
+
+        print(transcription)
+
     }
     
     

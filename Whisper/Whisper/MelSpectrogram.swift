@@ -213,17 +213,48 @@ public class MelSpectrogram
                         
         }
         
-        // WHen LDA is 80
+        var minValue: Float = 1e-10
+        var maxValue: Float = 0.0
+        var maxIndex: vDSP_Length = 0
 
-        // lda must be >= MAX(K,1): lda=80 K=200.ldc must be >= MAX(N,1): ldc=80 N=3000. BLAS error: Parameter number 9 passed to cblas_sgemm had an invalid value
-//        ldc must be >= MAX(N,1): ldc=80 N=3000. BLAS error: Parameter number 14 passed to cblas_sgemm had an invalid value
-
-        //A045_C001_0603BW_analyzed
-    
-//        melSpectroGram = melSpectroGram.chunked(into: <#T##Int#>)
-            
-        return melSpectroGram // .chunked(into: 3000)
+        let melCount = melSpectroGram.count
         
+        melSpectroGram.withUnsafeMutableBytes { unsafeMelSpectrogram in
+            
+            var melBaseAddress = unsafeMelSpectrogram.bindMemory(to: Float.self).baseAddress!
+            // get the current max value
+            vDSP_maxvi(melBaseAddress, 1, &maxValue, &maxIndex, vDSP_Length(melCount))
+            
+            // Clip to a set min value, keeping the current max value
+            vDSP_vclip(melBaseAddress, 1, &minValue, &maxValue, melBaseAddress, 1, vDSP_Length(melCount))
+
+            // Take the log base 10
+//            vDSP_vdbcon(melBaseAddress, vDSP_Stride(1), melBaseAddress, &one, vDSP_Stride(1), vDSP_Length(melCount), UInt32(1))
+            vDSP_vdbcon(melBaseAddress, 1,
+                        [1],
+                        melBaseAddress, 1,
+                        vDSP_Length(melCount),
+                        0)
+
+            
+            // get the new max value
+            vDSP_maxvi(melBaseAddress, 1, &maxValue, &maxIndex, vDSP_Length(melCount))
+
+            // update the max
+            maxValue = maxValue - 8.0
+            
+            // Clip to new Max value
+            vDSP_vclip(melBaseAddress, 1, &minValue, &maxValue, melBaseAddress, 1, vDSP_Length(melCount))
+
+            // Add 4 and Divide by 4
+            
+            var four:Float = 4.0
+            vDSP_vsadd(melBaseAddress, 1, &four, melBaseAddress, 1, vDSP_Length(melCount))
+            vDSP_vsdiv(melBaseAddress, 1, &four, melBaseAddress, 1, vDSP_Length(melCount))
+        }
+                
+        
+        return melSpectroGram
         
     }
     
