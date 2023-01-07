@@ -439,8 +439,8 @@ class GPT2Tokenizer {
 class WhisperTokenizer:GPT2Tokenizer
 {
     static let eotToken = 50256
-    static let sotToken = 50257 // 50257 or  50258?
-    static let langToken = 50259 // sotToken + 1 + lang_id;
+    static let sotToken = 50257 // 50257 metalcpp or 50258?
+    static let langToken = 50259 // sotToken + 1 + langIdx for a specific language, ie en is (langToken + 1)
     static let prevToken = 50360
     static let spolmToken = 50361 //?
     static let notToken = 50362
