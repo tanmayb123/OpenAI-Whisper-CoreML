@@ -31,7 +31,8 @@ public class Whisper {
 
     // a chunk of audio samples, we decode that amount from some input
     // it seems like we pad by 200 in the beginning and end?
-    var accruedAudioSamples:[Float] = []
+    
+    var accruedAudioSamples:[Int16] = []
     var numOfAccruedAudioSamples:Int = 0
     
     init() throws {
@@ -45,7 +46,7 @@ public class Whisper {
 //        self.accruedAudioSamples.append(contentsOf: [Float](repeating: 0, count: 200))
     }
     
-    func encode(audio: [Float]) throws -> MLMultiArray {
+    func encode(audio: [Int16]) throws -> MLMultiArray {
         let mel:[Float] = mel.processData(audio: audio)
 
         let array = try MLMultiArray(shape: [1, 80, 3000], dataType: .float32)
@@ -61,11 +62,16 @@ public class Whisper {
     
     func decode(audioFeatures: MLMultiArray) throws {
         
+        // Running list of decoded tokens
+        var decodedTokens:[Int] = []
+
         // Start transcription with the SOT token
         let sotToken = self.tokenizer.tokenToMultiArray(token: WhisperTokenizer.sotToken)
-        let decoded = try decoderModel.prediction(token_data: sotToken, audio_data: audioFeatures).var_2205
         
-        var decodedTokens:[Int] = []
+        print("Next Token:", sotToken)
+
+        // Decode our first token from our audio
+        let decoded = try decoderModel.prediction(token_data: sotToken, audio_data: audioFeatures).var_2205
         
         var nextToken = self.tokenizer.nextTokenGreedy(decoded: decoded)
         
@@ -76,10 +82,10 @@ public class Whisper {
             print("Next Token:", nextToken)
             let nextTokenArray = self.tokenizer.tokenToMultiArray(token: nextToken)
 
-            let decoded = try decoderModel.prediction(token_data: nextTokenArray, audio_data: audioFeatures).var_2205
+            let nextDecoded = try decoderModel.prediction(token_data: nextTokenArray, audio_data: audioFeatures).var_2205
             
-            nextToken = self.tokenizer.nextTokenGreedy(decoded: decoded)
-            
+            nextToken = self.tokenizer.nextTokenGreedy(decoded: nextDecoded)
+                        
             decodedTokens.append(nextToken)
 
             print(self.tokenizer.decode(tokens: decodedTokens))
@@ -121,9 +127,9 @@ public class Whisper {
                         
         for (buffer) in audioBufferList.convert()
         {
-            let floatArray:[Float] = buffer.convert()
+            let audioSampleArray:[Int16] = buffer.convertInt16()
                 
-            let samplesWeNeedToAccrueForAProperChunk = floatArray[0 ... samplesToAccrue - 1]
+            let samplesWeNeedToAccrueForAProperChunk = audioSampleArray[0 ... samplesToAccrue - 1]
             
             self.accruedAudioSamples.insert(contentsOf: samplesWeNeedToAccrueForAProperChunk, at: self.numOfAccruedAudioSamples)
                 
@@ -166,11 +172,12 @@ public class Whisper {
             
             let audioTracks = try await asset.loadTracks(withMediaType: .audio)
             
+            // Output SInt 16
             let audioOutputSettings = [ AVFormatIDKey : kAudioFormatLinearPCM,
                                       AVSampleRateKey : 16000,
-                                AVLinearPCMBitDepthKey: 32,
+                                AVLinearPCMBitDepthKey: 16,
                                  AVNumberOfChannelsKey: 1,
-                                AVLinearPCMIsFloatKey : true,
+                                AVLinearPCMIsFloatKey : false,
                            AVLinearPCMIsNonInterleaved: false,
                              AVLinearPCMIsBigEndianKey: false
                                         
@@ -249,7 +256,7 @@ extension AudioBufferList {
 }
 
 extension AudioBuffer {
-    public func convert() -> [Float] {
+    public func convertFloat() -> [Float] {
         if let mdata = self.mData {
             let ump = mdata.bindMemory(to: Float.self, capacity: Int(mDataByteSize))
             let usp = UnsafeBufferPointer(start: ump, count: Int(mDataByteSize) / MemoryLayout<Float>.size)
@@ -258,4 +265,15 @@ extension AudioBuffer {
             return []
         }
     }
+    
+    public func convertInt16() -> [Int16] {
+        if let mdata = self.mData {
+            let ump = mdata.bindMemory(to: Int16.self, capacity: Int(mDataByteSize))
+            let usp = UnsafeBufferPointer(start: ump, count: Int(mDataByteSize) / MemoryLayout<Int16>.size)
+            return [Int16](usp)
+        } else {
+            return []
+        }
+    }
+
 }

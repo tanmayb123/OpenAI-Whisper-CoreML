@@ -8,6 +8,10 @@ import Accelerate
 
 // Reference implementation we are attempting to match
 // https://github.com/openai/whisper/blob/main/whisper/audio.py#L92
+
+// See https://colab.research.google.com/drive/1r9ghakH8__jGqGiYHC2DXtKaW_ozdSrV#scrollTo=7baNvPkScRgk
+// For simple isolated code to test this implementation
+
 /*
   window = torch.hann_window(N_FFT).to(audio.device)
   stft = torch.stft(audio, N_FFT, HOP_LENGTH, window=window, return_complex=True)
@@ -142,20 +146,22 @@ public class MelSpectrogram
         self.complexSTFTImaginary = [[Float]](repeating: [Float](repeating: 0, count: self.numFFT/2), count: self.melSampleCount)
     }
     
-    func processData(audio: [Float]) -> [Float]
+    func processData(audio: [Int16]) -> [Float]
     {
         assert(self.sampleCount == audio.count)
-        
+            
+        var audioFloat:[Float] = [Float](repeating: 0, count: audio.count)
+        vDSP.convertElements(of: audio, to: &audioFloat)
+                
         // insert numFFT/2 samples before and numFFT/2 after so we have a extra numFFT amount to process
-        var audio = audio
-        audio.insert(contentsOf: [Float](repeating: 0, count: self.numFFT/2), at: 0)
-        audio.append(contentsOf: [Float](repeating: 0, count: self.numFFT/2))
+        audioFloat.insert(contentsOf: [Float](repeating: 0, count: self.numFFT/2), at: 0)
+        audioFloat.append(contentsOf: [Float](repeating: 0, count: self.numFFT/2))
         
         // we need to create 201 x 3000 matrix of STFTs - note we appear to want to output complex numbers (?)
         for (i) in 0 ..< self.melSampleCount
         {
             // Slice numFFTs every hop count (barf) and make a mel spectrum out of it
-            self.timeDomainValues = Array<Float>( audio[ (i * self.hopCount) ..< ( (i * self.hopCount) + self.numFFT) ] )
+            self.timeDomainValues = Array<Float>( audioFloat[ (i * self.hopCount) ..< ( (i * self.hopCount) + self.numFFT) ] )
             
             assert(self.timeDomainValues.count == self.numFFT)
             
@@ -164,8 +170,10 @@ public class MelSpectrogram
                                    temporaryRealBuffer: &self.realParts,
                                    temporaryImaginaryBuffer: &self.imaginaryParts)
             
-            vDSP.absolute(frequencyDomainBuffer, result: &frequencyDomainBuffer)
-            
+//            vDSP.absolute(frequencyDomainBuffer, result: &frequencyDomainBuffer)
+//            vDSP.absolute(self.realParts, result: &self.realParts)
+//            vDSP.absolute(self.imaginaryParts, result: &self.imaginaryParts)
+
             self.complexSTFTReal[i] = self.realParts
             self.complexSTFTImaginary[i] = self.imaginaryParts
         }
@@ -183,76 +191,83 @@ public class MelSpectrogram
         var melSpectroGram = [Float](repeating: 0, count: count)
         
         matrix.withUnsafeBufferPointer{ unsafeMatrixPtr in
-                // populate magnitude matrix with magnitudes squared
+            
+            // populate magnitude matrix with magnitudes squared
             vDSP_zvmags(unsafeMatrixPtr.baseAddress!, 1, &magnitudes, 1, vDSP_Length(count))
                 
             // MATRIX A mel filters is 80 rows x 201 columns
             // MATRIX B magnitudes is 3000 x 200
             // MATRIX B is TRANSPOSED to be 200 rows x 3000 columns
-            // MAtrix C melSpectroGram is 80 rows x 3000 columns
-            
+            // MATRIX C melSpectroGram is 80 rows x 3000 columns
             
             let M: Int32 = 80 // number of rows in matrix A
             let N: Int32 = 3000 // number of columns in matrix B
             let K: Int32 = 200 // number of columns in matrix A and number of rows in
+           
             // matrix multiply magitude squared matrix with our filter bank
+            // see https://www.advancedswift.com/matrix-math/
             cblas_sgemm(CblasRowMajor,
                         CblasNoTrans,           // Transpose A
                         CblasTrans,             // Transpose B magnitudes to be 200 x 3000
                         M,                      // M Number of rows in matrices A and C.
-                        N,            // N Number of columns in matrices B and C.
-                        K,             // K Number of columns in matrix A; number of rows in matrix B.
+                        N,                      // N Number of columns in matrices B and C.
+                        K,                      // K Number of columns in matrix A; number of rows in matrix B.
                         1,                      // Alpha Scaling factor for the product of matrices A and B.
-                        &self.melFilterMatrix,  // Matrix A
-                        K,              // LDA The size of the first dimension of matrix A; if you are passing a matrix A[m][n], the value should be m.
-                        &magnitudes,            // Matrix B
-                        N,             // LDB The size of the first dimension of matrix B; if you are passing a matrix B[m][n], the value should be m.
+                        self.melFilterMatrix,   // Matrix A
+                        K,                      // LDA The size of the first dimension of matrix A; if you are passing a matrix A[m][n], the value should be m.
+                        magnitudes,             // Matrix B
+                        N,                      // LDB The size of the first dimension of matrix B; if you are passing a matrix B[m][n], the value should be m.
                         0,                      // Beta Scaling factor for matrix C.
                         &melSpectroGram,        // Matrix C
-                        N)              // LDC The size of the first dimension of matrix C; if you are passing a matrix C[m][n], the value should be m.
-                        
+                        N)                      // LDC The size of the first dimension of matrix C; if you are passing a matrix C[m][n], the value should be m.
         }
         
         var minValue: Float = 1e-10
         var maxValue: Float = 0.0
         var maxIndex: vDSP_Length = 0
+        var minIndex: vDSP_Length = 0
 
         let melCount = melSpectroGram.count
         
-        melSpectroGram.withUnsafeMutableBytes { unsafeMelSpectrogram in
+//        melSpectroGram.withUnsafeMutableBufferPointer { unsafeMelSpectrogram in
+
+//            let melBaseAddress = unsafeMelSpectrogram.baseAddress!
             
-            var melBaseAddress = unsafeMelSpectrogram.bindMemory(to: Float.self).baseAddress!
             // get the current max value
-            vDSP_maxvi(melBaseAddress, 1, &maxValue, &maxIndex, vDSP_Length(melCount))
+            vDSP_maxvi(melSpectroGram, 1, &maxValue, &maxIndex, vDSP_Length(melCount))
             
             // Clip to a set min value, keeping the current max value
-            vDSP_vclip(melBaseAddress, 1, &minValue, &maxValue, melBaseAddress, 1, vDSP_Length(melCount))
+            vDSP_vclip(melSpectroGram, 1, &minValue, &maxValue, &melSpectroGram, 1, vDSP_Length(melCount))
 
             // Take the log base 10
-//            vDSP_vdbcon(melBaseAddress, vDSP_Stride(1), melBaseAddress, &one, vDSP_Stride(1), vDSP_Length(melCount), UInt32(1))
-            vDSP_vdbcon(melBaseAddress, 1,
-                        [1],
-                        melBaseAddress, 1,
+            var one:Float = 1.0
+            vDSP_vdbcon(melSpectroGram, 1,
+                        &one, // [20_000] ??
+                        &melSpectroGram, 1,
                         vDSP_Length(melCount),
                         0)
-
             
             // get the new max value
-            vDSP_maxvi(melBaseAddress, 1, &maxValue, &maxIndex, vDSP_Length(melCount))
-
-            // update the max
-            maxValue = maxValue - 8.0
+            vDSP_maxvi(melSpectroGram, 1, &maxValue, &maxIndex, vDSP_Length(melCount))
             
-            // Clip to new Max value
-            vDSP_vclip(melBaseAddress, 1, &minValue, &maxValue, melBaseAddress, 1, vDSP_Length(melCount))
+            // get the new min value
+            vDSP_minvi(melSpectroGram, 1, &minValue, &minIndex, vDSP_Length(melCount))
+
+            // emulate
+            // log_spec = torch.maximum(log_spec, log_spec.max() - 8.0)
+            // we effectively clamp to max - 8.0
+            var newMin = maxValue - 8.0
+            
+            // Clip to new max and updated min
+            vDSP_vclip(melSpectroGram, 1, &newMin, &maxValue, &melSpectroGram, 1, vDSP_Length(melCount))
 
             // Add 4 and Divide by 4
             
             var four:Float = 4.0
-            vDSP_vsadd(melBaseAddress, 1, &four, melBaseAddress, 1, vDSP_Length(melCount))
-            vDSP_vsdiv(melBaseAddress, 1, &four, melBaseAddress, 1, vDSP_Length(melCount))
-        }
-                
+            vDSP_vsadd(melSpectroGram, 1, &four, &melSpectroGram, 1, vDSP_Length(melCount))
+            vDSP_vsdiv(melSpectroGram, 1, &four, &melSpectroGram, 1, vDSP_Length(melCount))
+//        }
+           
         
         return melSpectroGram
         
@@ -309,25 +324,20 @@ public class MelSpectrogram
             }
         }
         
-//        // Populate interleaved `frequencyDomainValues` with the split values
-//        // from the real and imaginary arrays.
-//        temporaryRealBuffer.withUnsafeMutableBufferPointer { realPtr in
-//            temporaryImaginaryBuffer.withUnsafeMutableBufferPointer { imagPtr in
-//                var splitComplex = DSPSplitComplex(realp: realPtr.baseAddress!,
-//                                                   imagp: imagPtr.baseAddress!)
-//
-//                frequencyDomainValues.withUnsafeMutableBytes { ptr in
-//                    vDSP_ztoc(&splitComplex, 1,
-//                              ptr.bindMemory(to: DSPComplex.self).baseAddress!, 2,
-//                              vDSP_Length(self.numFFT / 2))
-//                }
-//            }
-//        }
-    }
+        // Populate interleaved `frequencyDomainValues` with the split values
+        // from the real and imaginary arrays.
+        temporaryRealBuffer.withUnsafeMutableBufferPointer { realPtr in
+            temporaryImaginaryBuffer.withUnsafeMutableBufferPointer { imagPtr in
+                var splitComplex = DSPSplitComplex(realp: realPtr.baseAddress!,
+                                                   imagp: imagPtr.baseAddress!)
 
-    func generateSpectrogram(audio: [Float]) -> [Float] {
-        
-        return processData(audio: audio)
+                frequencyDomainValues.withUnsafeMutableBytes { ptr in
+                    vDSP_ztoc(&splitComplex, 1,
+                              ptr.bindMemory(to: DSPComplex.self).baseAddress!, 2,
+                              vDSP_Length(self.numFFT / 2))
+                }
+            }
+        }
     }
 
 
