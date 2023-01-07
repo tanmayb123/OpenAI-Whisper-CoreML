@@ -35,7 +35,7 @@ def convert_decoder_to_tvm(model):
         traced_model,
         convert_to="mlprogram",
         inputs=[
-            ct.TensorType(shape=tokens_shape),
+            ct.TensorType(shape=tokens_shape, dtype=int),
             ct.TensorType(shape=audio_shape)
         ]
     )
