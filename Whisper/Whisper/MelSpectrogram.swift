@@ -13,23 +13,23 @@ import Accelerate
 // For simple isolated code to test this implementation
 
 /*
-  window = torch.hann_window(N_FFT).to(audio.device)
-  stft = torch.stft(audio, N_FFT, HOP_LENGTH, window=window, return_complex=True)
- 
-  magnitudes = stft[:, :-1].abs() ** 2
+    window = torch.hann_window(N_FFT).to(audio.device)
+    stft = torch.stft(audio, N_FFT, HOP_LENGTH, window=window, return_complex=True)
 
-  filters = mel_filters(audio.device, n_mels)
-  mel_spec = filters @ magnitudes
+    magnitudes = stft[:, :-1].abs() ** 2
 
-  log_spec = torch.clamp(mel_spec, min=1e-10).log10()
-  log_spec = torch.maximum(log_spec, log_spec.max() - 8.0)
-  log_spec = (log_spec + 4.0) / 4.0
- 
- stft torch.Size([201, 3001])
- magnitudes torch.Size([201, 3000])
- mel filters torch.Size([80, 201])
- mel spec torch.Size([80, 3000])
- log spec torch.Size([80, 3000])
+    filters = mel_filters(audio.device, n_mels)
+    mel_spec = filters @ magnitudes
+
+    log_spec = torch.clamp(mel_spec, min=1e-10).log10()
+    log_spec = torch.maximum(log_spec, log_spec.max() - 8.0)
+    log_spec = (log_spec + 4.0) / 4.0
+
+    stft torch.Size([201, 3001])
+    magnitudes torch.Size([201, 3000])
+    mel filters torch.Size([80, 201])
+    mel spec torch.Size([80, 3000])
+    log spec torch.Size([80, 3000])
  
  */
 
@@ -152,7 +152,9 @@ public class MelSpectrogram
             
         var audioFloat:[Float] = [Float](repeating: 0, count: audio.count)
         vDSP.convertElements(of: audio, to: &audioFloat)
-                
+              
+        vDSP.divide(audioFloat, 32768.0, result: &audioFloat)
+        
         // insert numFFT/2 samples before and numFFT/2 after so we have a extra numFFT amount to process
         audioFloat.insert(contentsOf: [Float](repeating: 0, count: self.numFFT/2), at: 0)
         audioFloat.append(contentsOf: [Float](repeating: 0, count: self.numFFT/2))
@@ -240,12 +242,8 @@ public class MelSpectrogram
             vDSP_vclip(melSpectroGram, 1, &minValue, &maxValue, &melSpectroGram, 1, vDSP_Length(melCount))
 
             // Take the log base 10
-            var one:Float = 1.0
-            vDSP_vdbcon(melSpectroGram, 1,
-                        &one, // [20_000] ??
-                        &melSpectroGram, 1,
-                        vDSP_Length(melCount),
-                        0)
+            var melCountInt32:UInt32 = UInt32(melCount)
+            vvlog10f(&melSpectroGram, melSpectroGram, &melCountInt32)
             
             // get the new max value
             vDSP_maxvi(melSpectroGram, 1, &maxValue, &maxIndex, vDSP_Length(melCount))
@@ -267,8 +265,7 @@ public class MelSpectrogram
             vDSP_vsadd(melSpectroGram, 1, &four, &melSpectroGram, 1, vDSP_Length(melCount))
             vDSP_vsdiv(melSpectroGram, 1, &four, &melSpectroGram, 1, vDSP_Length(melCount))
 //        }
-           
-        
+                   
         return melSpectroGram
         
     }
