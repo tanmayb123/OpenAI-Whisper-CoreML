@@ -458,6 +458,22 @@ class WhisperTokenizer:GPT2Tokenizer
 
         return array
     }
+    
+    func tokensToMultiArray(_ tokens: [Int], dims: Int = 2) -> MLMultiArray {
+        var shape = Array(repeating: 1, count: dims)
+        shape[shape.count - 1] = tokens.count
+        /// Examples:
+        /// dims=1 : [arr.count]
+        /// dims=2 : [1, arr.count]
+        ///
+        let o = try! MLMultiArray(shape: shape as [NSNumber], dataType: .int32)
+        let ptr = UnsafeMutablePointer<Int32>(OpaquePointer(o.dataPointer))
+        for (i, item) in tokens.enumerated() {
+            ptr[i] = Int32(item)
+        }
+        return o
+    }
+
 
     func simdMaxIndexForRange(startToken:Int, endToken:Int, decoded:MLMultiArray) -> (Int, Float)
     {
