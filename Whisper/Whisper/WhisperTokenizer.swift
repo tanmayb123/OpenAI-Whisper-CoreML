@@ -450,9 +450,12 @@ class WhisperTokenizer:GPT2Tokenizer
 
     func tokenToMultiArray(token:Int) -> MLMultiArray
     {
-        let array = try! MLMultiArray(shape: [1, 1], dataType: .float32)
-        array[0] = NSNumber(integerLiteral: token)
+        let array = try! MLMultiArray(shape: [1, 1], dataType: .int32)
         
+        let ptr = UnsafeMutablePointer<Int32>(OpaquePointer(array.dataPointer))
+
+        ptr[0] = Int32(token)
+
         return array
     }
 
@@ -466,9 +469,7 @@ class WhisperTokenizer:GPT2Tokenizer
         vDSP_maxvi(confidence, 1, &maxValue, &maxIndex, vDSP_Length(confidence.count))
         
         return (Int(maxIndex), maxValue)
-
     }
-    
    
     func predictLangToken(decoded:MLMultiArray) -> Int
     {
