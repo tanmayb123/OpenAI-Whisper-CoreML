@@ -64,10 +64,12 @@ public class Whisper {
         // Running list of decoded tokens
         var tokens:[Int] = []
 
-        // Start transcription with the SOT token
-        
+        // create sot sequence
+        // https://github.com/openai/whisper/blob/main/whisper/tokenizer.py#L325
         tokens.append(WhisperTokenizer.sotToken)
-
+        tokens.append(WhisperTokenizer.sotToken + 1)
+        tokens.append(WhisperTokenizer.transcribeToken)
+        
         let tokensArray = self.tokenizer.tokensToMultiArray(tokens, dims: 2)
         
         // Decode our first token from our audio
@@ -75,12 +77,9 @@ public class Whisper {
 
         var nextToken = self.tokenizer.nextTokenGreedy(decoded: decoded)
 
-        // dont include SOT tokens in our token list - cheap quick hack
-        tokens = []
-
         while ( nextToken != WhisperTokenizer.eotToken )
         {
-            print("Next Token:", nextToken)
+            print("Tokens :", tokens)
             
             tokens.append(nextToken)
             

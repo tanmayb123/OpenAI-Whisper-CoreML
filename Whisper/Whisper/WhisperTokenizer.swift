@@ -440,7 +440,11 @@ class WhisperTokenizer:GPT2Tokenizer
 {
     static let eotToken = 50256
     static let sotToken = 50257 // 50257 metalcpp or 50258?
+    
     static let langToken = 50259 // sotToken + 1 + langIdx for a specific language, ie en is (langToken + 1)
+    // .. language tokens length of lang array
+    static let translateToken = 50358
+    static let transcribeToken = 50359
     static let prevToken = 50360
     static let spolmToken = 50361 //?
     static let notToken = 50362
@@ -512,5 +516,69 @@ class WhisperTokenizer:GPT2Tokenizer
 //
 //        let (tokenIdx, _) = confidence.enumerated().max { $0.element < $1.element }!
 //        return tokenIdx
+    }
+    
+    // This is terrible
+    override func decode(tokens: [Int]) -> String {
+        
+        var pruned_tokens = tokens
+
+        if pruned_tokens.contains(WhisperTokenizer.eotToken)
+        {
+            pruned_tokens.remove(at: pruned_tokens.firstIndex(of: WhisperTokenizer.eotToken)!)
+        }
+        
+        if pruned_tokens.contains(WhisperTokenizer.sotToken)
+        {
+            pruned_tokens.remove(at: pruned_tokens.firstIndex(of: WhisperTokenizer.sotToken)!)
+        }
+
+        if pruned_tokens.contains(WhisperTokenizer.langToken)
+        {
+            pruned_tokens.remove(at: pruned_tokens.firstIndex(of: WhisperTokenizer.langToken)!)
+        }
+
+        if pruned_tokens.contains(WhisperTokenizer.translateToken)
+        {
+            pruned_tokens.remove(at: pruned_tokens.firstIndex(of: WhisperTokenizer.translateToken)!)
+        }
+
+        if pruned_tokens.contains(WhisperTokenizer.transcribeToken)
+        {
+            pruned_tokens.remove(at: pruned_tokens.firstIndex(of: WhisperTokenizer.transcribeToken)!)
+        }
+
+        if pruned_tokens.contains(WhisperTokenizer.prevToken)
+        {
+            pruned_tokens.remove(at: pruned_tokens.firstIndex(of: WhisperTokenizer.prevToken)!)
+        }
+
+        if pruned_tokens.contains(WhisperTokenizer.spolmToken)
+        {
+            pruned_tokens.remove(at: pruned_tokens.firstIndex(of: WhisperTokenizer.spolmToken)!)
+        }
+
+        if pruned_tokens.contains(WhisperTokenizer.notToken)
+        {
+            pruned_tokens.remove(at: pruned_tokens.firstIndex(of: WhisperTokenizer.notToken)!)
+        }
+
+        if pruned_tokens.contains(WhisperTokenizer.begToken)
+        {
+            pruned_tokens.remove(at: pruned_tokens.firstIndex(of: WhisperTokenizer.begToken)!)
+        }
+
+        if pruned_tokens.contains(50260) // English
+        {
+            pruned_tokens.remove(at: pruned_tokens.firstIndex(of: 50260)!)
+        }
+
+        if pruned_tokens.contains(50258) // Sot + 1
+        {
+            pruned_tokens.remove(at: pruned_tokens.firstIndex(of: 50258)!)
+        }
+
+        
+        return super.decode(tokens: pruned_tokens)
     }
 }
