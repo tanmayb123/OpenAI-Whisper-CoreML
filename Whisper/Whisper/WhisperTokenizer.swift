@@ -481,12 +481,22 @@ class WhisperTokenizer:GPT2Tokenizer
 
     func simdMaxIndexForRange(startToken:Int, endToken:Int, decoded:MLMultiArray) -> (Int, Float)
     {
-        let confidence:[Float] = (startToken...endToken).map { decoded[$0].floatValue }
+        // we need to look at the shape, and extract the 51865 array from the latest only.
+        // for example, if i have 23 tokens, i'll have a 1 x 23 x 51865 dim array
+        // we need the last 51865
+
+        let numTokenIDs = decoded.shape[2].intValue - 1
+        let numPredictedTokens = decoded.shape[1].intValue
+
+//        let ptr = UnsafeMutablePointer<Float>(OpaquePointer(decoded.dataPointer))
+
+        // This is slow, and should be optimized via raw pointer access
+        let confidence:[Float] = (startToken...endToken).map { decoded[$0 + (numTokenIDs * numPredictedTokens)].floatValue }
 
         var maxValue: Float = 0.0
         var maxIndex: vDSP_Length = 0
 
-        vDSP_maxvi(confidence, 1, &maxValue, &maxIndex, vDSP_Length(confidence.count))
+        vDSP_maxvi(confidence, 1, &maxValue, &maxIndex, vDSP_Length( numTokenIDs ) )
         
         return (Int(maxIndex), maxValue)
     }
@@ -499,7 +509,8 @@ class WhisperTokenizer:GPT2Tokenizer
 //        let confidence = (50259...50357).map { decoded[$0].floatValue }
 //        let (langIdx, _) = confidence.enumerated().max { $0.element < $1.element }!
 //
-//        return langIdx
+//        return langIdxpo c
+        
     }
     
     func langFromToken(token:Int) -> String
@@ -509,6 +520,7 @@ class WhisperTokenizer:GPT2Tokenizer
     
     func nextTokenGreedy(decoded:MLMultiArray) -> Int
     {
+        
         let (token, _) = self.simdMaxIndexForRange(startToken: 0, endToken: Self.eotToken, decoded: decoded)
         return token
 
@@ -521,62 +533,62 @@ class WhisperTokenizer:GPT2Tokenizer
     // This is terrible
     override func decode(tokens: [Int]) -> String {
         
-        var pruned_tokens = tokens
+        let pruned_tokens = tokens.filter{ $0 < WhisperTokenizer.eotToken}
 
-        if pruned_tokens.contains(WhisperTokenizer.eotToken)
-        {
-            pruned_tokens.remove(at: pruned_tokens.firstIndex(of: WhisperTokenizer.eotToken)!)
-        }
-        
-        if pruned_tokens.contains(WhisperTokenizer.sotToken)
-        {
-            pruned_tokens.remove(at: pruned_tokens.firstIndex(of: WhisperTokenizer.sotToken)!)
-        }
-
-        if pruned_tokens.contains(WhisperTokenizer.langToken)
-        {
-            pruned_tokens.remove(at: pruned_tokens.firstIndex(of: WhisperTokenizer.langToken)!)
-        }
-
-        if pruned_tokens.contains(WhisperTokenizer.translateToken)
-        {
-            pruned_tokens.remove(at: pruned_tokens.firstIndex(of: WhisperTokenizer.translateToken)!)
-        }
-
-        if pruned_tokens.contains(WhisperTokenizer.transcribeToken)
-        {
-            pruned_tokens.remove(at: pruned_tokens.firstIndex(of: WhisperTokenizer.transcribeToken)!)
-        }
-
-        if pruned_tokens.contains(WhisperTokenizer.prevToken)
-        {
-            pruned_tokens.remove(at: pruned_tokens.firstIndex(of: WhisperTokenizer.prevToken)!)
-        }
-
-        if pruned_tokens.contains(WhisperTokenizer.spolmToken)
-        {
-            pruned_tokens.remove(at: pruned_tokens.firstIndex(of: WhisperTokenizer.spolmToken)!)
-        }
-
-        if pruned_tokens.contains(WhisperTokenizer.notToken)
-        {
-            pruned_tokens.remove(at: pruned_tokens.firstIndex(of: WhisperTokenizer.notToken)!)
-        }
-
-        if pruned_tokens.contains(WhisperTokenizer.begToken)
-        {
-            pruned_tokens.remove(at: pruned_tokens.firstIndex(of: WhisperTokenizer.begToken)!)
-        }
-
-        if pruned_tokens.contains(50260) // English
-        {
-            pruned_tokens.remove(at: pruned_tokens.firstIndex(of: 50260)!)
-        }
-
-        if pruned_tokens.contains(50258) // Sot + 1
-        {
-            pruned_tokens.remove(at: pruned_tokens.firstIndex(of: 50258)!)
-        }
+//        if pruned_tokens.contains(WhisperTokenizer.eotToken)
+//        {
+//            pruned_tokens.remove(at: pruned_tokens.firstIndex(of: WhisperTokenizer.eotToken)!)
+//        }
+//
+//        if pruned_tokens.contains(WhisperTokenizer.sotToken)
+//        {
+//            pruned_tokens.remove(at: pruned_tokens.firstIndex(of: WhisperTokenizer.sotToken)!)
+//        }
+//
+//        if pruned_tokens.contains(WhisperTokenizer.langToken)
+//        {
+//            pruned_tokens.remove(at: pruned_tokens.firstIndex(of: WhisperTokenizer.langToken)!)
+//        }
+//
+//        if pruned_tokens.contains(WhisperTokenizer.translateToken)
+//        {
+//            pruned_tokens.remove(at: pruned_tokens.firstIndex(of: WhisperTokenizer.translateToken)!)
+//        }
+//
+//        if pruned_tokens.contains(WhisperTokenizer.transcribeToken)
+//        {
+//            pruned_tokens.remove(at: pruned_tokens.firstIndex(of: WhisperTokenizer.transcribeToken)!)
+//        }
+//
+//        if pruned_tokens.contains(WhisperTokenizer.prevToken)
+//        {
+//            pruned_tokens.remove(at: pruned_tokens.firstIndex(of: WhisperTokenizer.prevToken)!)
+//        }
+//
+//        if pruned_tokens.contains(WhisperTokenizer.spolmToken)
+//        {
+//            pruned_tokens.remove(at: pruned_tokens.firstIndex(of: WhisperTokenizer.spolmToken)!)
+//        }
+//
+//        if pruned_tokens.contains(WhisperTokenizer.notToken)
+//        {
+//            pruned_tokens.remove(at: pruned_tokens.firstIndex(of: WhisperTokenizer.notToken)!)
+//        }
+//
+//        if pruned_tokens.contains(WhisperTokenizer.begToken)
+//        {
+//            pruned_tokens.remove(at: pruned_tokens.firstIndex(of: WhisperTokenizer.begToken)!)
+//        }
+//
+//        if pruned_tokens.contains(50260) // English
+//        {
+//            pruned_tokens.remove(at: pruned_tokens.firstIndex(of: 50260)!)
+//        }
+//
+//        if pruned_tokens.contains(50258) // Sot + 1
+//        {
+//            pruned_tokens.remove(at: pruned_tokens.firstIndex(of: 50258)!)
+//        }
 
         
         return super.decode(tokens: pruned_tokens)
