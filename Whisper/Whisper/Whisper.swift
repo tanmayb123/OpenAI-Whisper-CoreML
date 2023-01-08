@@ -43,7 +43,6 @@ public class Whisper {
         self.encoderModel = try encoder(configuration: config)
         
         self.accruedAudioSamples.reserveCapacity( Whisper.kWhisperNumSamplesInChunk )
-//        self.accruedAudioSamples.append(contentsOf: [Float](repeating: 0, count: 200))
     }
     
     func encode(audio: [Int16]) throws -> MLMultiArray {
@@ -55,7 +54,7 @@ public class Whisper {
             array[index] = NSNumber(value: value)
         }
 
-        let encoded = try encoderModel.prediction(audio_input:array).var_1373
+        let encoded = try encoderModel.prediction(x_1:array).var_1373
         return encoded
 //        return array
     }
@@ -63,35 +62,40 @@ public class Whisper {
     func decode(audioFeatures: MLMultiArray) throws {
         
         // Running list of decoded tokens
-        var decodedTokens:[Int] = []
+        var tokens:[Int] = []
 
         // Start transcription with the SOT token
-        let sotToken = self.tokenizer.tokenToMultiArray(token: WhisperTokenizer.sotToken)
         
-        print("Next Token:", sotToken)
+        tokens.append(WhisperTokenizer.sotToken)
 
+        let tokensArray = self.tokenizer.tokensToMultiArray(tokens, dims: 2)
+        
         // Decode our first token from our audio
-        let decoded = try decoderModel.prediction(token_data: sotToken, audio_data: audioFeatures).var_2205
-        
+        let decoded = try decoderModel.prediction(token_data: tokensArray, audio_data: audioFeatures).var_2205
+
         var nextToken = self.tokenizer.nextTokenGreedy(decoded: decoded)
-        
-        decodedTokens.append(nextToken)
-        
+
+        // dont include SOT tokens in our token list - cheap quick hack
+        tokens = []
+
         while ( nextToken != WhisperTokenizer.eotToken )
         {
             print("Next Token:", nextToken)
-            let nextTokenArray = self.tokenizer.tokenToMultiArray(token: nextToken)
-
-            let nextDecoded = try decoderModel.prediction(token_data: nextTokenArray, audio_data: audioFeatures).var_2205
             
-            nextToken = self.tokenizer.nextTokenGreedy(decoded: nextDecoded)
-                        
-            decodedTokens.append(nextToken)
+            tokens.append(nextToken)
+            
+            let transcription = self.tokenizer.decode(tokens: tokens)
 
-            print(self.tokenizer.decode(tokens: decodedTokens))
+            print(transcription)
+
+            let tokensArray = self.tokenizer.tokensToMultiArray(tokens, dims: 2)
+
+            let decoded = try decoderModel.prediction(token_data: tokensArray, audio_data: audioFeatures).var_2205
+
+            nextToken = self.tokenizer.nextTokenGreedy(decoded: decoded)
         }
         
-        let transcription = self.tokenizer.decode(tokens: decodedTokens)
+        let transcription = self.tokenizer.decode(tokens: tokens)
 
         print(transcription)
 
@@ -137,9 +141,6 @@ public class Whisper {
             
             if (self.accruedAudioSamples.count == Whisper.kWhisperNumSamplesInChunk)
             {
-                
-//                print("Sending Chunk to Mel")
-                
                 do {
                     let encoded = try self.encode(audio: self.accruedAudioSamples)
                     try self.decode(audioFeatures: encoded)
