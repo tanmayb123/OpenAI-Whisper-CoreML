@@ -325,7 +325,7 @@ class GPT2Tokenizer {
     private let decoder: [Int: String]
     
     init() {
-        let url = Bundle.main.url(forResource: "gpt2-merges", withExtension: "txt")!
+        let url = Bundle.main.url(forResource: "multilingual-merges", withExtension: "txt")!
         let bpeMergesTxt = try! String(contentsOf: url)
         let arr = bpeMergesTxt.split(separator: "\n").map { String($0) }
         var bpeRanks: Dictionary<BytePair, Int> = [:]
@@ -337,7 +337,7 @@ class GPT2Tokenizer {
         self.bpeRanks = bpeRanks
         
         self.encoder = {
-            let url = Bundle.main.url(forResource: "gpt2-vocab", withExtension: "json")!
+            let url = Bundle.main.url(forResource: "multilingual-vocab", withExtension: "json")!
             let json = try! Data(contentsOf: url)
             let decoder = JSONDecoder()
             let vocab = try! decoder.decode([String: Int].self, from: json)
@@ -438,17 +438,18 @@ class GPT2Tokenizer {
 
 class WhisperTokenizer:GPT2Tokenizer
 {
-    static let eotToken = 50256
-    static let sotToken = 50257 // 50257 metalcpp or 50258?
-    
-    static let langToken = 50259 // sotToken + 1 + langIdx for a specific language, ie en is (langToken + 1)
-    // .. language tokens length of lang array
+    // https://github.com/huggingface/transformers/pull/19921
+    static let eotToken = 50257
+    static let sotToken = 50258
+    static let langToken = 50259
+    // sotToken + 1 + langIdx for a specific language, ie en is (langToken since it is index 0)
+    // .. language tokens length of lang array (99)
     static let translateToken = 50358
     static let transcribeToken = 50359
-    static let prevToken = 50360
-    static let spolmToken = 50361 //?
-    static let notToken = 50362
-    static let begToken = 50363
+    static let prevToken = 50361
+    static let spolmToken = 50362 //?
+    static let notToken = 50363
+    static let begToken = 50364
     
     static let LANGUAGES = ["en", "zh", "de", "es", "ru", "ko", "fr", "ja", "pt", "tr", "pl", "ca", "nl", "ar", "sv", "it", "id", "hi", "fi", "vi", "iw", "uk", "el", "ms", "cs", "ro", "da", "hu", "ta", "no", "th", "ur", "hr", "bg", "lt", "la", "mi", "ml", "cy", "sk", "te", "fa", "lv", "bn", "sr", "az", "sl", "kn", "et", "mk", "br", "eu", "is", "hy", "ne", "mn", "bs", "kk", "sq", "sw", "gl", "mr", "pa", "si", "km", "sn", "yo", "so", "af", "oc", "ka", "be", "tg", "sd", "gu", "am", "yi", "lo", "uz", "fo", "ht", "ps", "tk", "nn", "mt", "sa", "lb", "my", "bo", "tl", "mg", "as", "tt", "haw", "ln", "ha", "ba", "jw", "su"]
 
@@ -481,29 +482,38 @@ class WhisperTokenizer:GPT2Tokenizer
 
     func simdMaxIndexForRange(startToken:Int, endToken:Int, decoded:MLMultiArray) -> (Int, Float)
     {
-        // we need to look at the shape, and extract the 51865 array from the latest only.
+        // we need to look at the shape, and extract the latest 1 x 51865 logits.
         // for example, if i have 23 tokens, i'll have a 1 x 23 x 51865 dim array
-        // we need the last 51865
+        // we need the LATEST (ie, the 22nd) 51865 logits
 
-        let numTokenIDs = decoded.shape[2].intValue - 1
-        let numPredictedTokens = decoded.shape[1].intValue
-
-//        let ptr = UnsafeMutablePointer<Float>(OpaquePointer(decoded.dataPointer))
-
-        // This is slow, and should be optimized via raw pointer access
-        let confidence:[Float] = (startToken...endToken).map { decoded[$0 + (numTokenIDs * numPredictedTokens)].floatValue }
-
+        let numPredictedTokens = decoded.shape[1].intValue - 1
+        let numTokenIDs = decoded.shape[2].intValue
+        
         var maxValue: Float = 0.0
         var maxIndex: vDSP_Length = 0
 
-        vDSP_maxvi(confidence, 1, &maxValue, &maxIndex, vDSP_Length( numTokenIDs ) )
+        // This is the offset into the entire
+        let offsetIntoLogits = (numTokenIDs * numPredictedTokens)
         
-        return (Int(maxIndex), maxValue)
+        // This is slow, and should be optimized via raw pointer access
+        var confidence:[Float] = (startToken..<endToken).map {
+            decoded[offsetIntoLogits + $0].floatValue
+            
+        }
+
+        confidence = Math.softmax(confidence)
+        
+        vDSP_maxvi(confidence, 1, &maxValue, &maxIndex, vDSP_Length( confidence.count ) )
+
+        //        let ptr = UnsafeMutablePointer<Float>(OpaquePointer(decoded.dataPointer))
+        //        vDSP_maxvi(ptr + (numTokenIDs * numPredictedTokens), 1, &maxValue, &maxIndex, vDSP_Length( numTokenIDs ) )
+
+        return (Int(maxIndex) + startToken, maxValue)
     }
    
     func predictLangToken(decoded:MLMultiArray) -> Int
     {
-        let (token, _) = self.simdMaxIndexForRange(startToken: Self.langToken, endToken: 50357, decoded: decoded)
+        let (token, _) = self.simdMaxIndexForRange(startToken: Self.langToken, endToken: WhisperTokenizer.sotToken, decoded: decoded)
         return token
 
 //        let confidence = (50259...50357).map { decoded[$0].floatValue }
@@ -521,7 +531,7 @@ class WhisperTokenizer:GPT2Tokenizer
     func nextTokenGreedy(decoded:MLMultiArray) -> Int
     {
         
-        let (token, _) = self.simdMaxIndexForRange(startToken: 0, endToken: Self.eotToken, decoded: decoded)
+        let (token, _) = self.simdMaxIndexForRange(startToken: 0, endToken: WhisperTokenizer.sotToken, decoded: decoded)
         return token
 
 //        let confidence = (0...Self.eotToken).map {decoded[$0].floatValue }
@@ -530,67 +540,12 @@ class WhisperTokenizer:GPT2Tokenizer
 //        return tokenIdx
     }
     
-    // This is terrible
     override func decode(tokens: [Int]) -> String {
         
+        // We need a method to not let our custom tokens hit the vocab
+        // We also likely need to match some special processing done
         let pruned_tokens = tokens.filter{ $0 < WhisperTokenizer.eotToken}
-
-//        if pruned_tokens.contains(WhisperTokenizer.eotToken)
-//        {
-//            pruned_tokens.remove(at: pruned_tokens.firstIndex(of: WhisperTokenizer.eotToken)!)
-//        }
-//
-//        if pruned_tokens.contains(WhisperTokenizer.sotToken)
-//        {
-//            pruned_tokens.remove(at: pruned_tokens.firstIndex(of: WhisperTokenizer.sotToken)!)
-//        }
-//
-//        if pruned_tokens.contains(WhisperTokenizer.langToken)
-//        {
-//            pruned_tokens.remove(at: pruned_tokens.firstIndex(of: WhisperTokenizer.langToken)!)
-//        }
-//
-//        if pruned_tokens.contains(WhisperTokenizer.translateToken)
-//        {
-//            pruned_tokens.remove(at: pruned_tokens.firstIndex(of: WhisperTokenizer.translateToken)!)
-//        }
-//
-//        if pruned_tokens.contains(WhisperTokenizer.transcribeToken)
-//        {
-//            pruned_tokens.remove(at: pruned_tokens.firstIndex(of: WhisperTokenizer.transcribeToken)!)
-//        }
-//
-//        if pruned_tokens.contains(WhisperTokenizer.prevToken)
-//        {
-//            pruned_tokens.remove(at: pruned_tokens.firstIndex(of: WhisperTokenizer.prevToken)!)
-//        }
-//
-//        if pruned_tokens.contains(WhisperTokenizer.spolmToken)
-//        {
-//            pruned_tokens.remove(at: pruned_tokens.firstIndex(of: WhisperTokenizer.spolmToken)!)
-//        }
-//
-//        if pruned_tokens.contains(WhisperTokenizer.notToken)
-//        {
-//            pruned_tokens.remove(at: pruned_tokens.firstIndex(of: WhisperTokenizer.notToken)!)
-//        }
-//
-//        if pruned_tokens.contains(WhisperTokenizer.begToken)
-//        {
-//            pruned_tokens.remove(at: pruned_tokens.firstIndex(of: WhisperTokenizer.begToken)!)
-//        }
-//
-//        if pruned_tokens.contains(50260) // English
-//        {
-//            pruned_tokens.remove(at: pruned_tokens.firstIndex(of: 50260)!)
-//        }
-//
-//        if pruned_tokens.contains(50258) // Sot + 1
-//        {
-//            pruned_tokens.remove(at: pruned_tokens.firstIndex(of: 50258)!)
-//        }
-
         
-        return super.decode(tokens: pruned_tokens)
+        return  super.decode(tokens: pruned_tokens)
     }
 }

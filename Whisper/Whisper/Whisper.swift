@@ -61,35 +61,40 @@ public class Whisper {
     
     func decode(audioFeatures: MLMultiArray) throws {
         
-        // Running list of decoded tokens
+        // SOT Initialize sequence
         var tokens:[Int] = []
 
         // create sot sequence
         // https://github.com/openai/whisper/blob/main/whisper/tokenizer.py#L325
         tokens.append(WhisperTokenizer.sotToken)
-        tokens.append(WhisperTokenizer.sotToken + 1)
+        tokens.append(WhisperTokenizer.langToken)
         tokens.append(WhisperTokenizer.transcribeToken)
+        tokens.append(WhisperTokenizer.notToken)
         
-        let tokensArray = self.tokenizer.tokensToMultiArray(tokens, dims: 2)
+        let sotSequenceArray = self.tokenizer.tokensToMultiArray(tokens, dims: 2)
         
         // Decode our first token from our audio
-        let decoded = try decoderModel.prediction(token_data: tokensArray, audio_data: audioFeatures).var_2205
+        let decoded = try decoderModel.prediction(token_data: sotSequenceArray, audio_data: audioFeatures).var_2205
 
         var nextToken = self.tokenizer.nextTokenGreedy(decoded: decoded)
 
+        // Running list of decoded tokens
+
         while ( nextToken != WhisperTokenizer.eotToken )
         {
-//            print("Tokens :", tokens)
-            
             tokens.append(nextToken)
             
             let transcription = self.tokenizer.decode(tokens: tokens)
 
             print(transcription)
 
-            let tokensArray = self.tokenizer.tokensToMultiArray(tokens, dims: 2)
+//            var sotPrevSequence = [WhisperTokenizer.prevToken]//, WhisperTokenizer.sotToken + 1, WhisperTokenizer.transcribeToken]
+//            sotPrevSequence.append(contentsOf: tokens)
+////            sotPrevSequence.append(nextToken)
+  
+            let sotPrevSequenceArray = self.tokenizer.tokensToMultiArray(tokens, dims: 2)
 
-            let decoded = try decoderModel.prediction(token_data: tokensArray, audio_data: audioFeatures).var_2205
+            let decoded = try decoderModel.prediction(token_data: sotPrevSequenceArray, audio_data: audioFeatures).var_2205
 
             nextToken = self.tokenizer.nextTokenGreedy(decoded: decoded)
         }
