@@ -66,7 +66,7 @@ public class Whisper {
 
         // create sot sequence
         // https://github.com/openai/whisper/blob/main/whisper/tokenizer.py#L325
-        // https://github.com/huggingface/transformers/blob/e98821f12ba9a899d2907ebcb7d114aff8712c0b/tests/models/whisper/test_tokenization_whisper.py
+        // https://github.com/huggingface/transformers/blob/main/tests/models/whisper/test_tokenization_whisper.py
         tokens.append(WhisperTokenizer.sotToken)
         tokens.append(WhisperTokenizer.langToken)
         tokens.append(WhisperTokenizer.transcribeToken)
