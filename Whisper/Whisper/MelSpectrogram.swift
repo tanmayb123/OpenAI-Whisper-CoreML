@@ -159,19 +159,46 @@ public class MelSpectrogram
         audioFloat.insert(contentsOf: [Float](repeating: 0, count: self.numFFT/2), at: 0)
         audioFloat.append(contentsOf: [Float](repeating: 0, count: self.numFFT/2))
         
+        let log2n = vDSP_Length(log2(Float(self.numFFT)))
+
+        let fft = vDSP.FFT(log2n: log2n,
+                           radix: .radix2,
+                           ofType: DSPSplitComplex.self)
+
+        
         // we need to create 201 x 3000 matrix of STFTs - note we appear to want to output complex numbers (?)
         for (i) in 0 ..< self.melSampleCount
         {
             // Slice numFFTs every hop count (barf) and make a mel spectrum out of it
-            self.timeDomainValues = Array<Float>( audioFloat[ (i * self.hopCount) ..< ( (i * self.hopCount) + self.numFFT) ] )
+            var audioFrame = Array<Float>( audioFloat[ (i * self.hopCount) ..< ( (i * self.hopCount) + self.numFFT) ] )
             
-            assert(self.timeDomainValues.count == self.numFFT)
+            assert(audioFrame.count == self.numFFT)
             
-            self.performForwardDFT(timeDomainValues: &self.timeDomainValues,
-                                   frequencyDomainValues: &self.frequencyDomainBuffer,
-                                   temporaryRealBuffer: &self.realParts,
-                                   temporaryImaginaryBuffer: &self.imaginaryParts)
-            
+            self.realParts.withUnsafeMutableBufferPointer { realPtr in
+                self.imaginaryParts.withUnsafeMutableBufferPointer { imagPtr in
+                    
+                    vDSP.multiply(audioFrame,
+                                  hanningWindow,
+                                  result: &audioFrame)
+
+                    var complexSignal = DSPSplitComplex(realp: realPtr.baseAddress!,
+                                                        imagp: imagPtr.baseAddress!)
+                           
+                    audioFrame.withUnsafeBytes { unsafeAudioBytes in
+                        vDSP.convert(interleavedComplexVector: [DSPComplex](unsafeAudioBytes.bindMemory(to: DSPComplex.self)),
+                                     toSplitComplexVector: &complexSignal)
+                    }
+                    
+                    fft?.forward(input: complexSignal,
+                                 output: &complexSignal)
+                }
+            }
+
+//            self.performForwardDFT(timeDomainValues: &self.timeDomainValues,
+//                                   frequencyDomainValues: &self.frequencyDomainBuffer,
+//                                   temporaryRealBuffer: &self.realParts,
+//                                   temporaryImaginaryBuffer: &self.imaginaryParts)
+//
 //            vDSP.absolute(frequencyDomainBuffer, result: &frequencyDomainBuffer)
 //            vDSP.absolute(self.realParts, result: &self.realParts)
 //            vDSP.absolute(self.imaginaryParts, result: &self.imaginaryParts)
@@ -189,8 +216,8 @@ public class MelSpectrogram
         // Then multiply it with our mel filter bank
         let count = self.complexSTFTReal.count * self.complexSTFTReal[0].count
         var magnitudes = [Float](repeating: 0, count: count)
-        var melSpectroGram = [Float](repeating: 0, count: count)
-
+        var melSpectroGram = [Float](repeating: 0, count: 80 * 3000)
+        
         flattnedReal.withUnsafeMutableBytes { unsafeReal in
             flattnedImaginary.withUnsafeMutableBytes { unsafeImaginary in
 
@@ -200,8 +227,14 @@ public class MelSpectrogram
                
                // populate magnitude matrix with magnitudes squared
                vDSP_zvmags(matrix, 1, &magnitudes, 1, vDSP_Length(count))
-               
-               // MATRIX A mel filters is 80 rows x 201 columns
+
+                // transpose magnitudes
+                vDSP_mtrans(magnitudes, 1, &magnitudes, 1, 3000, 200)
+                
+                // Matrix A, a MxK sized matrix
+                // Matrix B, a KxN sized matrix
+                
+               // MATRIX A mel filters is 80 rows x 200 columns
                // MATRIX B magnitudes is 3000 x 200
                // MATRIX B is TRANSPOSED to be 200 rows x 3000 columns
                // MATRIX C melSpectroGram is 80 rows x 3000 columns
@@ -214,16 +247,16 @@ public class MelSpectrogram
                // see https://www.advancedswift.com/matrix-math/
                cblas_sgemm(CblasRowMajor,
                            CblasNoTrans,           // Transpose A
-                           CblasTrans,             // Transpose B magnitudes to be 200 x 3000
+                           CblasNoTrans,             // Transpose B magnitudes to be 200 x 3000
                            M,                      // M Number of rows in matrices A and C.
                            N,                      // N Number of columns in matrices B and C.
                            K,                      // K Number of columns in matrix A; number of rows in matrix B.
-                           1,                      // Alpha Scaling factor for the product of matrices A and B.
+                           1.0,                      // Alpha Scaling factor for the product of matrices A and B.
                            self.melFilterMatrix,   // Matrix A
                            K,                      // LDA The size of the first dimension of matrix A; if you are passing a matrix A[m][n], the value should be m.
                            magnitudes,             // Matrix B
                            N,                      // LDB The size of the first dimension of matrix B; if you are passing a matrix B[m][n], the value should be m.
-                           0,                      // Beta Scaling factor for matrix C.
+                           1,                      // Beta Scaling factor for matrix C.
                            &melSpectroGram,        // Matrix C
                            N)                      // LDC The size of the first dimension of matrix C; if you are passing a matrix C[m][n], the value should be m.
                //        }
@@ -234,10 +267,6 @@ public class MelSpectrogram
                var minIndex: vDSP_Length = 0
                
                let melCount = melSpectroGram.count
-               
-               //        melSpectroGram.withUnsafeMutableBufferPointer { unsafeMelSpectrogram in
-               
-               //            let melBaseAddress = unsafeMelSpectrogram.baseAddress!
                
                // get the current max value
                vDSP_maxvi(melSpectroGram, 1, &maxValue, &maxIndex, vDSP_Length(melCount))
@@ -264,11 +293,9 @@ public class MelSpectrogram
                vDSP_vclip(melSpectroGram, 1, &newMin, &maxValue, &melSpectroGram, 1, vDSP_Length(melCount))
                
                // Add 4 and Divide by 4
-               
                var four:Float = 4.0
                vDSP_vsadd(melSpectroGram, 1, &four, &melSpectroGram, 1, vDSP_Length(melCount))
                vDSP_vsdiv(melSpectroGram, 1, &four, &melSpectroGram, 1, vDSP_Length(melCount))
-               //        }
                
             }
         }
