@@ -181,93 +181,100 @@ public class MelSpectrogram
         }
         
         // We create flattened  3000 x 200 array of DSPSplitComplex values
-        let flattnedReal:[Float] = self.complexSTFTReal.flatMap { $0 }
-        let flattnedImaginary:[Float] = self.complexSTFTImaginary.flatMap { $0 }
-        
-        let matrix = [DSPSplitComplex](repeating: DSPSplitComplex(realp: UnsafeMutablePointer(mutating:flattnedReal), imagp: UnsafeMutablePointer(mutating:flattnedImaginary) ), count: flattnedReal.count)
+        var flattnedReal:[Float] = self.complexSTFTReal.flatMap { $0 }
+        var flattnedImaginary:[Float] = self.complexSTFTImaginary.flatMap { $0 }
+
         
         // Take the magnitude squared of the matrix, which results in a Result flat array of 3000 x 200 of real floats
         // Then multiply it with our mel filter bank
         let count = self.complexSTFTReal.count * self.complexSTFTReal[0].count
         var magnitudes = [Float](repeating: 0, count: count)
         var melSpectroGram = [Float](repeating: 0, count: count)
-        
-        matrix.withUnsafeBufferPointer{ unsafeMatrixPtr in
-            
-            // populate magnitude matrix with magnitudes squared
-            vDSP_zvmags(unsafeMatrixPtr.baseAddress!, 1, &magnitudes, 1, vDSP_Length(count))
-                
-            // MATRIX A mel filters is 80 rows x 201 columns
-            // MATRIX B magnitudes is 3000 x 200
-            // MATRIX B is TRANSPOSED to be 200 rows x 3000 columns
-            // MATRIX C melSpectroGram is 80 rows x 3000 columns
-            
-            let M: Int32 = 80 // number of rows in matrix A
-            let N: Int32 = 3000 // number of columns in matrix B
-            let K: Int32 = 200 // number of columns in matrix A and number of rows in
-           
-            // matrix multiply magitude squared matrix with our filter bank
-            // see https://www.advancedswift.com/matrix-math/
-            cblas_sgemm(CblasRowMajor,
-                        CblasNoTrans,           // Transpose A
-                        CblasTrans,             // Transpose B magnitudes to be 200 x 3000
-                        M,                      // M Number of rows in matrices A and C.
-                        N,                      // N Number of columns in matrices B and C.
-                        K,                      // K Number of columns in matrix A; number of rows in matrix B.
-                        1,                      // Alpha Scaling factor for the product of matrices A and B.
-                        self.melFilterMatrix,   // Matrix A
-                        K,                      // LDA The size of the first dimension of matrix A; if you are passing a matrix A[m][n], the value should be m.
-                        magnitudes,             // Matrix B
-                        N,                      // LDB The size of the first dimension of matrix B; if you are passing a matrix B[m][n], the value should be m.
-                        0,                      // Beta Scaling factor for matrix C.
-                        &melSpectroGram,        // Matrix C
-                        N)                      // LDC The size of the first dimension of matrix C; if you are passing a matrix C[m][n], the value should be m.
+
+        flattnedReal.withUnsafeMutableBytes { unsafeReal in
+            flattnedImaginary.withUnsafeMutableBytes { unsafeImaginary in
+
+                let matrix = [DSPSplitComplex](repeating: DSPSplitComplex(realp: unsafeReal.bindMemory(to: Float.self).baseAddress!,
+                                                                          imagp: unsafeImaginary.bindMemory(to: Float.self).baseAddress!),
+                                               count: count)
+               
+               // populate magnitude matrix with magnitudes squared
+               vDSP_zvmags(matrix, 1, &magnitudes, 1, vDSP_Length(count))
+               
+               // MATRIX A mel filters is 80 rows x 201 columns
+               // MATRIX B magnitudes is 3000 x 200
+               // MATRIX B is TRANSPOSED to be 200 rows x 3000 columns
+               // MATRIX C melSpectroGram is 80 rows x 3000 columns
+               
+               let M: Int32 = 80 // number of rows in matrix A
+               let N: Int32 = 3000 // number of columns in matrix B
+               let K: Int32 = 200 // number of columns in matrix A and number of rows in
+               
+               // matrix multiply magitude squared matrix with our filter bank
+               // see https://www.advancedswift.com/matrix-math/
+               cblas_sgemm(CblasRowMajor,
+                           CblasNoTrans,           // Transpose A
+                           CblasTrans,             // Transpose B magnitudes to be 200 x 3000
+                           M,                      // M Number of rows in matrices A and C.
+                           N,                      // N Number of columns in matrices B and C.
+                           K,                      // K Number of columns in matrix A; number of rows in matrix B.
+                           1,                      // Alpha Scaling factor for the product of matrices A and B.
+                           self.melFilterMatrix,   // Matrix A
+                           K,                      // LDA The size of the first dimension of matrix A; if you are passing a matrix A[m][n], the value should be m.
+                           magnitudes,             // Matrix B
+                           N,                      // LDB The size of the first dimension of matrix B; if you are passing a matrix B[m][n], the value should be m.
+                           0,                      // Beta Scaling factor for matrix C.
+                           &melSpectroGram,        // Matrix C
+                           N)                      // LDC The size of the first dimension of matrix C; if you are passing a matrix C[m][n], the value should be m.
+               //        }
+               
+               var minValue: Float = 1e-10
+               var maxValue: Float = 0.0
+               var maxIndex: vDSP_Length = 0
+               var minIndex: vDSP_Length = 0
+               
+               let melCount = melSpectroGram.count
+               
+               //        melSpectroGram.withUnsafeMutableBufferPointer { unsafeMelSpectrogram in
+               
+               //            let melBaseAddress = unsafeMelSpectrogram.baseAddress!
+               
+               // get the current max value
+               vDSP_maxvi(melSpectroGram, 1, &maxValue, &maxIndex, vDSP_Length(melCount))
+               
+               // Clip to a set min value, keeping the current max value
+               vDSP_vclip(melSpectroGram, 1, &minValue, &maxValue, &melSpectroGram, 1, vDSP_Length(melCount))
+               
+               // Take the log base 10
+               var melCountInt32:UInt32 = UInt32(melCount)
+               vvlog10f(&melSpectroGram, melSpectroGram, &melCountInt32)
+               
+               // get the new max value
+               vDSP_maxvi(melSpectroGram, 1, &maxValue, &maxIndex, vDSP_Length(melCount))
+               
+               // get the new min value
+               vDSP_minvi(melSpectroGram, 1, &minValue, &minIndex, vDSP_Length(melCount))
+               
+               // emulate
+               // log_spec = torch.maximum(log_spec, log_spec.max() - 8.0)
+               // we effectively clamp to max - 8.0
+               var newMin = maxValue - 8.0
+               
+               // Clip to new max and updated min
+               vDSP_vclip(melSpectroGram, 1, &newMin, &maxValue, &melSpectroGram, 1, vDSP_Length(melCount))
+               
+               // Add 4 and Divide by 4
+               
+               var four:Float = 4.0
+               vDSP_vsadd(melSpectroGram, 1, &four, &melSpectroGram, 1, vDSP_Length(melCount))
+               vDSP_vsdiv(melSpectroGram, 1, &four, &melSpectroGram, 1, vDSP_Length(melCount))
+               //        }
+               
+            }
         }
         
-        var minValue: Float = 1e-10
-        var maxValue: Float = 0.0
-        var maxIndex: vDSP_Length = 0
-        var minIndex: vDSP_Length = 0
-
-        let melCount = melSpectroGram.count
-        
-//        melSpectroGram.withUnsafeMutableBufferPointer { unsafeMelSpectrogram in
-
-//            let melBaseAddress = unsafeMelSpectrogram.baseAddress!
-            
-            // get the current max value
-            vDSP_maxvi(melSpectroGram, 1, &maxValue, &maxIndex, vDSP_Length(melCount))
-            
-            // Clip to a set min value, keeping the current max value
-            vDSP_vclip(melSpectroGram, 1, &minValue, &maxValue, &melSpectroGram, 1, vDSP_Length(melCount))
-
-            // Take the log base 10
-            var melCountInt32:UInt32 = UInt32(melCount)
-            vvlog10f(&melSpectroGram, melSpectroGram, &melCountInt32)
-            
-            // get the new max value
-            vDSP_maxvi(melSpectroGram, 1, &maxValue, &maxIndex, vDSP_Length(melCount))
-            
-            // get the new min value
-            vDSP_minvi(melSpectroGram, 1, &minValue, &minIndex, vDSP_Length(melCount))
-
-            // emulate
-            // log_spec = torch.maximum(log_spec, log_spec.max() - 8.0)
-            // we effectively clamp to max - 8.0
-            var newMin = maxValue - 8.0
-            
-            // Clip to new max and updated min
-            vDSP_vclip(melSpectroGram, 1, &newMin, &maxValue, &melSpectroGram, 1, vDSP_Length(melCount))
-
-            // Add 4 and Divide by 4
-            
-            var four:Float = 4.0
-            vDSP_vsadd(melSpectroGram, 1, &four, &melSpectroGram, 1, vDSP_Length(melCount))
-            vDSP_vsdiv(melSpectroGram, 1, &four, &melSpectroGram, 1, vDSP_Length(melCount))
-//        }
-                   
         return melSpectroGram
-        
+
     }
     
   
