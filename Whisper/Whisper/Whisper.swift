@@ -66,37 +66,30 @@ public class Whisper {
 
         // create sot sequence
         // https://github.com/openai/whisper/blob/main/whisper/tokenizer.py#L325
+        // https://github.com/huggingface/transformers/blob/e98821f12ba9a899d2907ebcb7d114aff8712c0b/tests/models/whisper/test_tokenization_whisper.py
         tokens.append(WhisperTokenizer.sotToken)
         tokens.append(WhisperTokenizer.langToken)
         tokens.append(WhisperTokenizer.transcribeToken)
         tokens.append(WhisperTokenizer.notToken)
         
-        let sotSequenceArray = self.tokenizer.tokensToMultiArray(tokens, dims: 2)
+        var nextToken = 0
         
-        // Decode our first token from our audio
-        let decoded = try decoderModel.prediction(token_data: sotSequenceArray, audio_data: audioFeatures).var_2205
-
-        var nextToken = self.tokenizer.nextTokenGreedy(decoded: decoded)
-
-        // Running list of decoded tokens
-
         while ( nextToken != WhisperTokenizer.eotToken )
         {
-            tokens.append(nextToken)
             
             let transcription = self.tokenizer.decode(tokens: tokens)
 
             print(transcription)
 
-//            var sotPrevSequence = [WhisperTokenizer.prevToken]//, WhisperTokenizer.sotToken + 1, WhisperTokenizer.transcribeToken]
-//            sotPrevSequence.append(contentsOf: tokens)
-////            sotPrevSequence.append(nextToken)
-  
-            let sotPrevSequenceArray = self.tokenizer.tokensToMultiArray(tokens, dims: 2)
+            let tokensArray = self.tokenizer.tokensToMultiArray(tokens, dims: 2)
+//            let tokensArray = self.tokenizer.tokensToMultiArray([nextToken], dims: 2)
 
-            let decoded = try decoderModel.prediction(token_data: sotPrevSequenceArray, audio_data: audioFeatures).var_2205
+            let decoded = try decoderModel.prediction(token_data: tokensArray, audio_data: audioFeatures).var_2205
 
             nextToken = self.tokenizer.nextTokenGreedy(decoded: decoded)
+            
+            tokens.append(nextToken)
+
         }
         
         let transcription = self.tokenizer.decode(tokens: tokens)
