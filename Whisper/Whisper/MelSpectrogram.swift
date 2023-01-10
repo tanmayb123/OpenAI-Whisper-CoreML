@@ -186,10 +186,6 @@ public class MelSpectrogram
             flattnedImaginary.withUnsafeMutableBytes { unsafeFlatImaginary in
                 
                 // We create a Split Complex representation of our flattened real and imaginary component
-//                let complexMatrix = [DSPSplitComplex](repeating: DSPSplitComplex(realp: unsafeFlatReal.bindMemory(to: Float.self).baseAddress!,
-//                                                                          imagp: unsafeFlatImaginary.bindMemory(to: Float.self).baseAddress!),
-//                                               count: count)
-
                 let complexMatrix = DSPSplitComplex(realp: unsafeFlatReal.bindMemory(to: Float.self).baseAddress!,
                                                     imagp: unsafeFlatImaginary.bindMemory(to: Float.self).baseAddress!)
                                     
@@ -262,42 +258,19 @@ public class MelSpectrogram
                             &melSpectroGram,        // Matrix C
                             N)                      // LDC The size of the first dimension of matrix C; if you are passing a matrix C[m][n], the value should be m.
                 
-//                var minValue: Float = 0.0000000001 // 1e-10
-//                var minIndex: vDSP_Length = 0
-//
-//                var maxValue: Float = 0.0
-//                var maxIndex: vDSP_Length = 0
-                
-                
-                // Step 7 - get the current max value
-//                vDSP_maxvi(melSpectroGram, 1, &maxValue, &maxIndex, vDSP_Length(melCount))
-                // Step 7 - Clip to a set min value, keeping the current max value
+                // Step 7 - clamp / clip the min to 1e-10
                 vDSP.clip(melSpectroGram, to: (1e-10)...(vDSP.maximum(melSpectroGram)), result: &melSpectroGram)
                 
                 // Step 7 - Take the log base 10
                 // vDSP_vdbcon and power:toDecibels seems to fuck things up here and isnt right, even though its what everyone else uses?
-                // vDSP.convert(power: melSpectroGram, toDecibels: &melSpectroGram, zeroReference:20000.0)
+                vForce.log10(melSpectroGram, result: &melSpectroGram)
 
-                var melCountInt32:UInt32 = UInt32(melSpectroGram.count)
-                vvlog10f(&melSpectroGram, melSpectroGram, &melCountInt32)
-
-                // Step 8 - get the new max value
-//                vDSP_maxvi(melSpectroGram, 1, &maxValue, &maxIndex, vDSP_Length(melCount))
-                
-                // Step 8 - get the new min value
-//                vDSP_minvi(melSpectroGram, 1, &minValue, &minIndex, vDSP_Length(melCount))
-
-                // Step 8 -
-                // we effectively clamp to max - 8.0
-//                var newMin = maxValue - 8.0
-//
                 // Step 8 -
                 // Clip to new max and updated min
                 let newMin = vDSP.maximum(melSpectroGram) - 8.0
                 vDSP.clip(melSpectroGram, to: (newMin)...(vDSP.maximum(melSpectroGram)), result: &melSpectroGram)
-//                vDSP.maximum(melSpectroGram, <#T##vectorB: AccelerateBuffer##AccelerateBuffer#>, result: &<#T##AccelerateMutableBuffer#>)
+
                 // Step 9 - Add 4 and Divide by 4
-//                var four:Float = 4.0
                 vDSP.add(4.0, melSpectroGram, result: &melSpectroGram)
                 vDSP.divide(melSpectroGram, 4.0, result: &melSpectroGram)
 
