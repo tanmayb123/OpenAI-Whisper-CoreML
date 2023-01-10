@@ -17,6 +17,7 @@
 		1B58A610296A3BAB006E0969 /* MLMultiArray+Utils.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1B58A60F296A3BAB006E0969 /* MLMultiArray+Utils.swift */; };
 		1B58A613296BD704006E0969 /* multilingual-vocab.json in Resources */ = {isa = PBXBuildFile; fileRef = 1B58A611296BD704006E0969 /* multilingual-vocab.json */; };
 		1B58A614296BD704006E0969 /* multilingual-merges.txt in Resources */ = {isa = PBXBuildFile; fileRef = 1B58A612296BD704006E0969 /* multilingual-merges.txt */; };
+		1B58A618296E03FF006E0969 /* python_log_mel.raw in Resources */ = {isa = PBXBuildFile; fileRef = 1B58A617296E03FE006E0969 /* python_log_mel.raw */; };
 		1B6A59D929634F2A004C510D /* MelSpectrogram.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1B6A59D829634F2A004C510D /* MelSpectrogram.swift */; };
 		1B6A59DC29635145004C510D /* decoder.mlpackage in Sources */ = {isa = PBXBuildFile; fileRef = 1B6A59DA29635145004C510D /* decoder.mlpackage */; };
 		1B6A59DD29635145004C510D /* encoder.mlpackage in Sources */ = {isa = PBXBuildFile; fileRef = 1B6A59DB29635145004C510D /* encoder.mlpackage */; };
@@ -41,6 +42,7 @@
 		1B58A60F296A3BAB006E0969 /* MLMultiArray+Utils.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = "MLMultiArray+Utils.swift"; sourceTree = "<group>"; };
 		1B58A611296BD704006E0969 /* multilingual-vocab.json */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.json; path = "multilingual-vocab.json"; sourceTree = "<group>"; };
 		1B58A612296BD704006E0969 /* multilingual-merges.txt */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = "multilingual-merges.txt"; sourceTree = "<group>"; };
+		1B58A617296E03FE006E0969 /* python_log_mel.raw */ = {isa = PBXFileReference; lastKnownFileType = file; path = python_log_mel.raw; sourceTree = "<group>"; };
 		1B6A59D829634F2A004C510D /* MelSpectrogram.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MelSpectrogram.swift; sourceTree = "<group>"; };
 		1B6A59DA29635145004C510D /* decoder.mlpackage */ = {isa = PBXFileReference; lastKnownFileType = folder.mlpackage; path = decoder.mlpackage; sourceTree = "<group>"; };
 		1B6A59DB29635145004C510D /* encoder.mlpackage */ = {isa = PBXFileReference; lastKnownFileType = folder.mlpackage; path = encoder.mlpackage; sourceTree = "<group>"; };
@@ -99,6 +101,7 @@
 				1BFAC9DF2968F11100A5A099 /* gpt2-vocab.json */,
 				1B58A612296BD704006E0969 /* multilingual-merges.txt */,
 				1B58A611296BD704006E0969 /* multilingual-vocab.json */,
+				1B58A617296E03FE006E0969 /* python_log_mel.raw */,
 				01AF98FC28E28BF3002DAC53 /* Assets.xcassets */,
 				01AF98FE28E28BF3002DAC53 /* Preview Content */,
 			);
@@ -181,6 +184,7 @@
 			files = (
 				1B6A59DF2963A1A6004C510D /* mel_filters.data in Resources */,
 				01AF990028E28BF3002DAC53 /* Preview Assets.xcassets in Resources */,
+				1B58A618296E03FF006E0969 /* python_log_mel.raw in Resources */,
 				1B58A614296BD704006E0969 /* multilingual-merges.txt in Resources */,
 				1B58A613296BD704006E0969 /* multilingual-vocab.json in Resources */,
 				1BFAC9E02968F11100A5A099 /* gpt2-merges.txt in Resources */,

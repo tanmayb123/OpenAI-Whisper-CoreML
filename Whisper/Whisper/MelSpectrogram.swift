@@ -121,24 +121,28 @@ public class MelSpectrogram
         
         // insert numFFT/2 samples before and numFFT/2 after so we have a extra numFFT amount to process
         // TODO: Is this stricly necessary?
-        audioFloat.insert(contentsOf: [Float](repeating: 0, count: self.numFFT/2), at: 0)
-        audioFloat.append(contentsOf: [Float](repeating: 0, count: self.numFFT/2))
+//        audioFloat.insert(contentsOf: [Float](repeating: 0, count: self.numFFT/2), at: 0)
+//        audioFloat.append(contentsOf: [Float](repeating: 0, count: self.numFFT/2))
+
+        audioFloat.append(contentsOf: [Float](repeating: 0, count: self.numFFT))
 
         // Split Complex arrays holding the FFT results
         var allSampleReal = [[Float]](repeating: [Float](repeating: 0, count: self.numFFT/2), count: self.melSampleCount)
         var allSampleImaginary = [[Float]](repeating: [Float](repeating: 0, count: self.numFFT/2), count: self.melSampleCount)
 
         // Step 2 - we need to create 200z x 3000 matrix of STFTs - note we appear to want to output complex numbers (?)
-        for (i) in 0 ..< self.melSampleCount
+        for (m) in 0 ..< self.melSampleCount
         {
             // Slice numFFTs every hop count (barf) and make a mel spectrum out of it
-            var audioFrame = Array<Float>( audioFloat[ (i * self.hopCount) ..< ( (i * self.hopCount) + self.numFFT) ] )
+            // audioFrame ends up holding split complex numbers
+            var audioFrame = Array<Float>( audioFloat[ (m * self.hopCount) ..< ( (m * self.hopCount) + self.numFFT) ] )
             
             assert(audioFrame.count == self.numFFT)
             
             // Split Complex arrays holding a single FFT result of our Audio Frame, which gets appended to the allSample Split Complex arrays
             var sampleReal:[Float] = [Float](repeating: 0, count: self.numFFT/2)
             var sampleImaginary:[Float] = [Float](repeating: 0, count: self.numFFT/2)
+
             
             sampleReal.withUnsafeMutableBytes { unsafeReal in
                 sampleImaginary.withUnsafeMutableBytes { unsafeImaginary in
@@ -156,13 +160,14 @@ public class MelSpectrogram
                     }
                     
                     // Step 3 - creating the FFT
-                    self.fft.forward(input: complexSignal,
-                                 output: &complexSignal)
+                    self.fft.forward(input: complexSignal, output: &complexSignal)
+                    
+                    
                 }
             }
 
-            allSampleReal[i] = sampleReal
-            allSampleImaginary[i] = sampleImaginary
+            allSampleReal[m] = sampleReal
+            allSampleImaginary[m] = sampleImaginary
         }
         
         // We now have allSample Split Complex holding 3000  200 dimensional real and imaginary FFT results
@@ -181,9 +186,13 @@ public class MelSpectrogram
             flattnedImaginary.withUnsafeMutableBytes { unsafeFlatImaginary in
                 
                 // We create a Split Complex representation of our flattened real and imaginary component
-                let complexMatrix = [DSPSplitComplex](repeating: DSPSplitComplex(realp: unsafeFlatReal.bindMemory(to: Float.self).baseAddress!,
-                                                                          imagp: unsafeFlatImaginary.bindMemory(to: Float.self).baseAddress!),
-                                               count: count)
+//                let complexMatrix = [DSPSplitComplex](repeating: DSPSplitComplex(realp: unsafeFlatReal.bindMemory(to: Float.self).baseAddress!,
+//                                                                          imagp: unsafeFlatImaginary.bindMemory(to: Float.self).baseAddress!),
+//                                               count: count)
+
+                let complexMatrix = DSPSplitComplex(realp: unsafeFlatReal.bindMemory(to: Float.self).baseAddress!,
+                                                    imagp: unsafeFlatImaginary.bindMemory(to: Float.self).baseAddress!)
+                                    
                 
                 // Complex Matrix now has values like
                 // (0.268574476 (real), -0.00511540473 (img))
@@ -204,7 +213,8 @@ public class MelSpectrogram
                 // Step 4 -
                 // populate magnitude matrix with magnitudes squared
                 // Magnitudes now contains single float 32
-                vDSP_zvmags(complexMatrix, 1, &magnitudes, 1, vDSP_Length(count))
+//                vDSP_zvmags(complexMatrix, 1, &magnitudes, 1, vDSP_Length(count))
+                vDSP.squareMagnitudes(complexMatrix, result: &magnitudes)
                 
                 // Magitude Values
                 // 0.07215842, 0.07432404, 0.07712047, 0.07292664,
@@ -218,9 +228,8 @@ public class MelSpectrogram
                 // Similar range, but very different values
                 
                 // transpose magnitudes from 3000 X 200, to 200 x 3000
+                vDSP_mtrans(magnitudes, 1, &magnitudes, 1, 200, 3000) // verified correct
 
-                vDSP_mtrans(magnitudes, 1, &magnitudes, 1, 200, 3000)
-                
                 // Step 5 & 6 (filters loaded earlier)
 
                 // MATRIX A, a MxK sized matrix
@@ -249,46 +258,49 @@ public class MelSpectrogram
                             K,                      // LDA The size of the first dimension of matrix A; if you are passing a matrix A[m][n], the value should be m.
                             magnitudes,             // Matrix B
                             N,                      // LDB The size of the first dimension of matrix B; if you are passing a matrix B[m][n], the value should be m.
-                            1,                      // Beta Scaling factor for matrix C.
+                            0,                      // Beta Scaling factor for matrix C.
                             &melSpectroGram,        // Matrix C
                             N)                      // LDC The size of the first dimension of matrix C; if you are passing a matrix C[m][n], the value should be m.
                 
-                var minValue: Float = 1e-10
-                var maxValue: Float = 0.0
-                var maxIndex: vDSP_Length = 0
-                var minIndex: vDSP_Length = 0
+//                var minValue: Float = 0.0000000001 // 1e-10
+//                var minIndex: vDSP_Length = 0
+//
+//                var maxValue: Float = 0.0
+//                var maxIndex: vDSP_Length = 0
                 
-                let melCount = melSpectroGram.count
                 
                 // Step 7 - get the current max value
-                vDSP_maxvi(melSpectroGram, 1, &maxValue, &maxIndex, vDSP_Length(melCount))
-                
+//                vDSP_maxvi(melSpectroGram, 1, &maxValue, &maxIndex, vDSP_Length(melCount))
                 // Step 7 - Clip to a set min value, keeping the current max value
-                vDSP_vclip(melSpectroGram, 1, &minValue, &maxValue, &melSpectroGram, 1, vDSP_Length(melCount))
+                vDSP.clip(melSpectroGram, to: (1e-10)...(vDSP.maximum(melSpectroGram)), result: &melSpectroGram)
                 
                 // Step 7 - Take the log base 10
-                var melCountInt32:UInt32 = UInt32(melCount)
+                // vDSP_vdbcon and power:toDecibels seems to fuck things up here and isnt right, even though its what everyone else uses?
+                // vDSP.convert(power: melSpectroGram, toDecibels: &melSpectroGram, zeroReference:20000.0)
+
+                var melCountInt32:UInt32 = UInt32(melSpectroGram.count)
                 vvlog10f(&melSpectroGram, melSpectroGram, &melCountInt32)
-                
+
                 // Step 8 - get the new max value
-                vDSP_maxvi(melSpectroGram, 1, &maxValue, &maxIndex, vDSP_Length(melCount))
+//                vDSP_maxvi(melSpectroGram, 1, &maxValue, &maxIndex, vDSP_Length(melCount))
                 
                 // Step 8 - get the new min value
-                vDSP_minvi(melSpectroGram, 1, &minValue, &minIndex, vDSP_Length(melCount))
+//                vDSP_minvi(melSpectroGram, 1, &minValue, &minIndex, vDSP_Length(melCount))
 
                 // Step 8 -
                 // we effectively clamp to max - 8.0
-                var newMin = maxValue - 8.0
-                
+//                var newMin = maxValue - 8.0
+//
                 // Step 8 -
                 // Clip to new max and updated min
-                vDSP_vclip(melSpectroGram, 1, &newMin, &maxValue, &melSpectroGram, 1, vDSP_Length(melCount))
-                
+                let newMin = vDSP.maximum(melSpectroGram) - 8.0
+                vDSP.clip(melSpectroGram, to: (newMin)...(vDSP.maximum(melSpectroGram)), result: &melSpectroGram)
+//                vDSP.maximum(melSpectroGram, <#T##vectorB: AccelerateBuffer##AccelerateBuffer#>, result: &<#T##AccelerateMutableBuffer#>)
                 // Step 9 - Add 4 and Divide by 4
-                var four:Float = 4.0
-                vDSP_vsadd(melSpectroGram, 1, &four, &melSpectroGram, 1, vDSP_Length(melCount))
-                vDSP_vsdiv(melSpectroGram, 1, &four, &melSpectroGram, 1, vDSP_Length(melCount))
-                
+//                var four:Float = 4.0
+                vDSP.add(4.0, melSpectroGram, result: &melSpectroGram)
+                vDSP.divide(melSpectroGram, 4.0, result: &melSpectroGram)
+
             }
         }
         // At this point we have a Log Mel Spectrogram who has values between -4 and 4
@@ -314,7 +326,23 @@ public class MelSpectrogram
 
         return floatArray;
     }
+    
+    static func loadReferencePythonRawMelToDebugShit() -> [Float] {
+    //        let numpyFloatArrayLength = 16080
+        let fileURL = Bundle.main.url(forResource: "python_log_mel", withExtension:"raw")
+        let fileHandle = try! FileHandle(forReadingFrom: fileURL!)
+
+        let floatData = fileHandle.readDataToEndOfFile()
+        let floatArray = floatData.withUnsafeBytes { unsafeFloatArray in
+            return Array(UnsafeBufferPointer<Float>(start: unsafeFloatArray.bindMemory(to: Float.self).baseAddress!, count: floatData.count / MemoryLayout<Float>.stride /*(80 * 3000)*/) )
+        }
+
+        return floatArray;
+    }
 }
+
+
+
 
 extension Array {
     func chunked(into size: Int) -> [[Element]] {

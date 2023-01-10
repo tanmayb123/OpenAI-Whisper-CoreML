@@ -8,6 +8,7 @@
 import Foundation
 import CoreML
 import AVFoundation
+import Accelerate
 
 public class Whisper {
     
@@ -47,12 +48,38 @@ public class Whisper {
     
     func encode(audio: [Int16]) throws -> MLMultiArray {
         let mel:[Float] = mel.processData(audio: audio)
-
+//        let mel = MelSpectrogram.loadReferencePythonRawMelToDebugShit()
+        
+        var normalizedFloatMel =  mel
+        
+        let count = normalizedFloatMel.count
+        normalizedFloatMel.withUnsafeBufferPointer { unsafeMel in
+            
+//            var four:Float = 4.0
+//            var eight:Float = 8.0
+//            vDSP_vsadd(normalizedFloatMel, 1, &four, &normalizedFloatMel, 1, vDSP_Length(count))
+//            vDSP_vsdiv(normalizedFloatMel, 1, &eight, &normalizedFloatMel, 1, vDSP_Length(count))
+            
+            
+            let data = Data(buffer: unsafeMel)
+            do {
+                try data.write(to: URL(fileURLWithPath: "/Users/vade/Downloads/rawMel.raw"))
+            }
+            catch {
+            }
+        }
+        
         let array = try MLMultiArray(shape: [1, 80, 3000], dataType: .float32)
 
-        for (index, value) in mel.enumerated() {
-            array[index] = NSNumber(value: value)
+        mel.withUnsafeBytes { melPtr in
+            array.withUnsafeMutableBytes { arrayPtr, strides in
+                memcpy(arrayPtr.baseAddress!, melPtr.baseAddress!, 80 * 3000 * MemoryLayout<Float>.size)
+            }
         }
+        
+//        for (index, value) in mel.enumerated() {
+//            array[index] = NSNumber(value: value)
+//        }
 
         let encoded = try encoderModel.prediction(x_1:array).var_1373
         return encoded
@@ -70,26 +97,26 @@ public class Whisper {
         tokens.append(WhisperTokenizer.sotToken)
         tokens.append(WhisperTokenizer.langToken)
         tokens.append(WhisperTokenizer.transcribeToken)
-        tokens.append(WhisperTokenizer.notToken)
+//        tokens.append(WhisperTokenizer.notToken)
         
         var nextToken = 0
         
         while ( nextToken != WhisperTokenizer.eotToken )
         {
-            
-            let transcription = self.tokenizer.decode(tokens: tokens)
-
-            print(transcription)
-
-            let tokensArray = self.tokenizer.tokensToMultiArray(tokens, dims: 2)
-//            let tokensArray = self.tokenizer.tokensToMultiArray([nextToken], dims: 2)
-
-            let decoded = try decoderModel.prediction(token_data: tokensArray, audio_data: audioFeatures).var_2205
-
-            nextToken = self.tokenizer.nextTokenGreedy(decoded: decoded)
-            
-            tokens.append(nextToken)
-
+            autoreleasepool {
+                //            let transcription = self.tokenizer.decode(tokens: tokens)
+                //
+                //            print(transcription)
+                
+                let tokensArray = self.tokenizer.tokensToMultiArray(tokens, dims: 2)
+                //            let tokensArray = self.tokenizer.tokensToMultiArray([nextToken], dims: 2)
+                
+                let decoded = try! decoderModel.prediction(token_data: tokensArray, audio_data: audioFeatures).var_2205
+                
+                nextToken = self.tokenizer.nextTokenGreedy(decoded: decoded)
+                tokens.append(nextToken)
+                
+            }
         }
         
         let transcription = self.tokenizer.decode(tokens: tokens)
@@ -184,7 +211,7 @@ public class Whisper {
             ] as [String : Any]
             
             let audioOutput = AVAssetReaderAudioMixOutput(audioTracks: audioTracks, audioSettings: audioOutputSettings)
-            audioOutput.alwaysCopiesSampleData = true
+            audioOutput.alwaysCopiesSampleData = false
             
             if ( assetReader.canAdd(audioOutput) )
             {
@@ -218,7 +245,6 @@ public class Whisper {
                         print(assetReader.error as Any)
                         return
                     }
-                        
                 }
                                         
                 self.accrueSamplesFromSampleBuffer(sampleBuffer: audioSampleBuffer)
