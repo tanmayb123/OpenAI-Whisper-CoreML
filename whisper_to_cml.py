@@ -17,7 +17,7 @@ def convert_encoder_to_tvm(model):
     model = ct.convert(
         traced_model,
         convert_to="mlprogram",
-        inputs=[ct.TensorType(shape=input_shape)]
+        inputs=[ct.TensorType(name="logmel_data", shape=input_shape)]
     )
 
     return model
@@ -31,12 +31,16 @@ def convert_decoder_to_tvm(model):
     audio_data = torch.randn(audio_shape)
     traced_model = torch.jit.trace(model, (token_data, audio_data))
 
+    token_flexible_shape = ct.Shape(shape=(1,
+                              ct.RangeDim(lower_bound=1, upper_bound=-1, default=1)))
+
+
     model = ct.convert(
         traced_model,
         convert_to="mlprogram",
         inputs=[
-            ct.TensorType(shape=tokens_shape),
-            ct.TensorType(shape=audio_shape)
+            ct.TensorType(name="token_data", shape=token_flexible_shape, dtype=int),
+            ct.TensorType(name="audio_data", shape=audio_shape)
         ]
     )
 

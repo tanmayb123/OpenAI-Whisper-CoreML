@@ -6,16 +6,28 @@
 //
 
 import SwiftUI
+import AVFoundation
 
 struct ContentView: View {
     let whisper: Whisper
+    
+#if os(iOS)
+
     @ObservedObject var recorder = AudioRecorder()
+
+#elseif os(macOS)
+    
+    @ObservedObject var loader = AudioLoader()
+    
+#endif
     
     init() throws {
         whisper = try Whisper()
     }
     
     var body: some View {
+#if os(iOS)
+
         ZStack {
             RoundedRectangle(cornerRadius: 20)
                 .frame(height: 60)
@@ -29,37 +41,56 @@ struct ContentView: View {
         }
         .onTapGesture {
             if recorder.canRecord && !recorder.recording {
-                getAudioPredict()
+                
+                do {
+                    try recorder.startRecording()
+                } catch let error {
+                    fatalError("Couldn't record. Error: \(error)")
+                }
+                
+                let audioAssetURL: URL
+                do {
+                    audioAssetURL = try recorder.finishRecording()
+                } catch let error {
+                    fatalError("Couldn't finish recording. Error: \(error)")
+                }
+                
+                getAudioPredict(url: audioAssetURL)
             }
         }
         .onAppear {
             recorder.setup()
         }
-    }
-    
-    func getAudioPredict() {
-        do {
-            try recorder.startRecording()
-        } catch let error {
-            fatalError("Couldn't record. Error: \(error)")
-        }
-        
-        Timer.scheduledTimer(withTimeInterval: 10, repeats: false) { _ in
-            let audio: [Float]
-            do {
-                audio = try recorder.finishRecording()
-            } catch let error {
-                fatalError("Couldn't finish recording. Error: \(error)")
-            }
+
+#elseif os(macOS)
+        ZStack {
+            RoundedRectangle(cornerRadius: 20)
+                .frame(height: 60)
+                .padding()
+                .foregroundColor(.blue)
             
+            Text("Load Audio File")
+                .font(.title2)
+                .bold()
+                .foregroundColor(.white)
+        }
+        .onTapGesture {
+            
+            getAudioPredict(url: loader.selectFileURL())
+            
+        }
+#endif
+
+    }
+
+    func getAudioPredict(url:URL) {
+     
+        Task {
             do {
                 let start = Date().timeIntervalSince1970
-                var input = [Double](repeating: 0, count: 16000 * 30)
-                for i in 0..<min(audio.count, input.count) {
-                    input[i] = Double(audio[i])
-                }
-                let encoded = try whisper.encode(audio: input)
-                try whisper.decode(audioFeatures: encoded)
+                
+                await whisper.predict(assetURL: url)
+                
                 print(Date().timeIntervalSince1970 - start)
             } catch let error {
                 fatalError("Couldn't predict. Error: \(error)")
