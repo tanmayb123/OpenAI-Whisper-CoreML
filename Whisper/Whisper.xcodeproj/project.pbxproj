@@ -18,6 +18,7 @@
 		1B58A613296BD704006E0969 /* multilingual-vocab.json in Resources */ = {isa = PBXBuildFile; fileRef = 1B58A611296BD704006E0969 /* multilingual-vocab.json */; };
 		1B58A614296BD704006E0969 /* multilingual-merges.txt in Resources */ = {isa = PBXBuildFile; fileRef = 1B58A612296BD704006E0969 /* multilingual-merges.txt */; };
 		1B58A618296E03FF006E0969 /* python_log_mel.raw in Resources */ = {isa = PBXBuildFile; fileRef = 1B58A617296E03FE006E0969 /* python_log_mel.raw */; };
+		1B58A61A2970C127006E0969 /* FFTImplementations.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1B58A6192970C127006E0969 /* FFTImplementations.swift */; };
 		1B6A59D929634F2A004C510D /* MelSpectrogram.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1B6A59D829634F2A004C510D /* MelSpectrogram.swift */; };
 		1B6A59DC29635145004C510D /* decoder.mlpackage in Sources */ = {isa = PBXBuildFile; fileRef = 1B6A59DA29635145004C510D /* decoder.mlpackage */; };
 		1B6A59DD29635145004C510D /* encoder.mlpackage in Sources */ = {isa = PBXBuildFile; fileRef = 1B6A59DB29635145004C510D /* encoder.mlpackage */; };
@@ -43,6 +44,7 @@
 		1B58A611296BD704006E0969 /* multilingual-vocab.json */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.json; path = "multilingual-vocab.json"; sourceTree = "<group>"; };
 		1B58A612296BD704006E0969 /* multilingual-merges.txt */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = "multilingual-merges.txt"; sourceTree = "<group>"; };
 		1B58A617296E03FE006E0969 /* python_log_mel.raw */ = {isa = PBXFileReference; lastKnownFileType = file; path = python_log_mel.raw; sourceTree = "<group>"; };
+		1B58A6192970C127006E0969 /* FFTImplementations.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FFTImplementations.swift; sourceTree = "<group>"; };
 		1B6A59D829634F2A004C510D /* MelSpectrogram.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MelSpectrogram.swift; sourceTree = "<group>"; };
 		1B6A59DA29635145004C510D /* decoder.mlpackage */ = {isa = PBXFileReference; lastKnownFileType = folder.mlpackage; path = decoder.mlpackage; sourceTree = "<group>"; };
 		1B6A59DB29635145004C510D /* encoder.mlpackage */ = {isa = PBXFileReference; lastKnownFileType = folder.mlpackage; path = encoder.mlpackage; sourceTree = "<group>"; };
@@ -88,6 +90,7 @@
 				01AF98F828E28BF2002DAC53 /* WhisperApp.swift */,
 				01AF991E28E2A97E002DAC53 /* Whisper.swift */,
 				1BFAC9DC2968F0A900A5A099 /* WhisperTokenizer.swift */,
+				1B58A6192970C127006E0969 /* FFTImplementations.swift */,
 				1B6A59D829634F2A004C510D /* MelSpectrogram.swift */,
 				01AF992428E2D90F002DAC53 /* AudioRecorder.swift */,
 				1B6A59E02963A670004C510D /* AudioLoader.swift */,
@@ -208,6 +211,7 @@
 				1B58A610296A3BAB006E0969 /* MLMultiArray+Utils.swift in Sources */,
 				01AF98F928E28BF2002DAC53 /* WhisperApp.swift in Sources */,
 				1B6A59E12963A670004C510D /* AudioLoader.swift in Sources */,
+				1B58A61A2970C127006E0969 /* FFTImplementations.swift in Sources */,
 				1B6A59DD29635145004C510D /* encoder.mlpackage in Sources */,
 				01AF991F28E2A97E002DAC53 /* Whisper.swift in Sources */,
 				1B58A60E296A3B40006E0969 /* Math.swift in Sources */,
