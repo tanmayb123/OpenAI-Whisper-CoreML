@@ -48,7 +48,7 @@ import Accelerate
 
 // alternatively
 // http://www.ml-illustrated.com/2020/06/01/deploy-pytorch-model-with-coreml-convert-issues.html
-// and https://github.com/ml-illustrated/Pytorch-CoreML-Spectrogram/blob/d0dd6c55eaf5fdcfaf00b1f036b258bd144b1ac4/python/model.py#L142
+//   https://github.com/ml-illustrated/Pytorch-CoreML-Spectrogram/blob/d0dd6c55eaf5fdcfaf00b1f036b258bd144b1ac4/python/model.py#L142
 
 public class MelSpectrogram
 {
@@ -71,7 +71,7 @@ public class MelSpectrogram
     var hopCount:Int = 160
 
         /// The forward fast Fourier transform object.
-    var fft: ComplexFFTStandard
+    var stft:STFT
 
 
     init(sampleCount:Int, hopCount:Int, melCount:Int, numFFT:Int)
@@ -85,56 +85,15 @@ public class MelSpectrogram
         
         self.melFilterMatrix = MelSpectrogram.makeFilterBankWithNumpyData()
         
-        self.fft = ComplexFFTStandard(numFFT: numFFT)
+        self.stft = STFT(fftLength: numFFT, windowType: .hanningDenormalized, windowLength: numFFT, sampleCount: sampleCount, hopCount: hopCount)
     }
 
     func processData(audio: [Int16]) -> [Float]
     {
-        // Step 1
-        assert(self.sampleCount == audio.count)
-            
-        var audioFloat:[Float] = [Float](repeating: 0, count: audio.count)
-                
-        vDSP.convertElements(of: audio, to: &audioFloat)
-        // Audio now in Float, at Signed Int ranges - matches Pytorch Exactly
+        // Calculate STFT
+        let (allSampleReal, allSampleImaginary) = self.stft.calculateSTFT(audio: audio)
 
-        vDSP.divide(audioFloat, 32768.0, result: &audioFloat)
-        // Audio now in -1.0 to 1.0 Float ranges - matches Pytorch exactly
-
-        // insert numFFT/2 samples before and numFFT/2 after so we have a extra numFFT amount to process
-        audioFloat.insert(contentsOf: [Float](repeating: 0, count: self.fft.numFFT/2), at: 0)
-        audioFloat.append(contentsOf: [Float](repeating: 0, count: self.fft.numFFT/2))
-        // Alternatively all at the end?
-//        audioFloat.append(contentsOf: [Float](repeating: 0, count: self.fft.numFFT))
-        
-        // Split Complex arrays holding the FFT results
-        var allSampleReal:[[Float]] = []
-        var allSampleImaginary:[[Float]] = []
-
-        // Step 2 - we need to create 3000 x 200 matrix of windowed FFTs
-        // Pytorch outputs complex numbers
-        for (m) in 0 ..< self.melSampleCount
-        {
-            // Slice numFFTs every hop count (barf) and make a mel spectrum out of it
-            // audioFrame ends up holding split complex numbers
-            
-            // TODO: Handle Pytorch STFT Defaults:
-            // TODO: Handle Centering  = True
-            // TODO: Handle Padding = Reflect
-            let audioFrame = Array<Float>( audioFloat[ (m * self.hopCount) ..< ( (m * self.hopCount) + self.fft.numFFT ) ] )
-
-            assert(audioFrame.count == self.fft.numFFT)
-
-            let (real, imaginary) = self.fft.forward(audioFrame)
-            
-            assert(real.count == self.fft.numFFT/2)
-            
-            allSampleReal.append(real)
-            allSampleImaginary.append(imaginary)
-        }
-        
-        // We now have allSample Split Complex holding 3000  200 dimensional real and imaginary FFT results
-        // We create flattened  3000 x 200 array of DSPSplitComplex values
+        // Unroll matrices into flat arrays for vDSP
         var flattnedReal:[Float] = allSampleReal.flatMap { $0 }
         var flattnedImaginary:[Float] = allSampleImaginary.flatMap { $0 }
 
@@ -149,17 +108,22 @@ public class MelSpectrogram
         flattnedReal.withUnsafeMutableBytes { unsafeFlatReal in
             flattnedImaginary.withUnsafeMutableBytes { unsafeFlatImaginary in
                 
-                // We create a Split Complex representation of our flattened real and imaginary component
+//                 We create a Split Complex representation of our flattened real and imaginary component
                 let complexMatrix = DSPSplitComplex(realp: unsafeFlatReal.bindMemory(to: Float.self).baseAddress!,
                                                     imagp: unsafeFlatImaginary.bindMemory(to: Float.self).baseAddress!)
 
                 vDSP.squareMagnitudes(complexMatrix, result: &magnitudes)
-        
+ 
+                // can ditch power spectrum above Nyquist rate
+//                magnitudes = Array( magnitudes.prefix(upTo: (magnitudes.count / 2) ) )
+                
+                
                 print("Swift 1 - magnitudes min", vDSP.minimum(magnitudes), "max", vDSP.maximum(magnitudes))
                 
-                // transpose magnitudes from 3000 X 200, to 200 x 3000
+//                 transpose magnitudes from 3000 X 200, to 200 x 3000
                 vDSP_mtrans(magnitudes, 1, &magnitudes, 1, 200, 3000) // verified correct
 
+                
                 // Step 5 & 6 (filters loaded earlier)
 
                 // MATRIX A, a MxK sized matrix
@@ -192,18 +156,20 @@ public class MelSpectrogram
                             &melSpectroGram,        // Matrix C
                             N)                      // LDC The size of the first dimension of matrix C; if you are passing a matrix C[m][n], the value should be m.
                 
+        
                 
                 print("Swift 2 - mel min", vDSP.minimum(melSpectroGram), "max", vDSP.maximum(melSpectroGram))
-                
+
                 // Step 7 - clamp / clip the min to 1e-10
                 vDSP.threshold(melSpectroGram, to: 1e-10, with: .clampToThreshold, result: &melSpectroGram)
 
                 print("Swift 3 - mel clip min", vDSP.minimum(melSpectroGram), "max", vDSP.maximum(melSpectroGram))
-                
+
                 // Step 7 - Take the log base 10 - vDSP_vdbcon and power:toDecibels seems to fuck things up here and isnt right, even though its what everyone else uses?
                 vForce.log10(melSpectroGram, result: &melSpectroGram)
                 print("Swift 4 - mel log min", vDSP.minimum(melSpectroGram), "max", vDSP.maximum(melSpectroGram))
-              
+
+                                
                 // Step 8 -
                 // Clip to new max and updated min
                 let newMin = vDSP.maximum(melSpectroGram) - 8.0
@@ -214,6 +180,9 @@ public class MelSpectrogram
                 // Step 9 - Add 4 and Divide by 4
                 vDSP.add(4.0, melSpectroGram, result: &melSpectroGram)
                 vDSP.divide(melSpectroGram, 4.0, result: &melSpectroGram)
+                
+                
+                
                 print("Swift 6 - mel log norm min", vDSP.minimum(melSpectroGram), "max", vDSP.maximum(melSpectroGram))
 
                 print("--------------")
@@ -257,6 +226,24 @@ public class MelSpectrogram
 
         return floatArray;
     }
+    
+//    func power_to_db(
+//      _ S:    Matrix<Float>,
+//      ref:    Float         = 1.0,
+//      amin:   Float         = 1e-10,
+//      top_db: Float?        = 80.0
+//    ) -> Matrix<Float> {
+//      precondition(amin > 0)
+//      let magnitude = S
+//      let ref_value = abs(ref)
+//      var log_spec  = 10.0 * magnitude.vect { np.log10(np.maximum($0, amin)) }
+//      log_spec      = log_spec.vect { $0 - 10.0 * log10(max(amin, ref_value)) }
+//      if let _top_db = top_db {
+//        precondition(_top_db >= 0)
+//        log_spec = log_spec.vect { np.maximum($0, max($0) - _top_db) }
+//      }
+//      return log_spec
+//    }
 }
 
 

@@ -77,10 +77,6 @@ public class Whisper {
             }
         }
         
-//        for (index, value) in mel.enumerated() {
-//            array[index] = NSNumber(value: value)
-//        }
-
 //        let encoded = try encoderModel.prediction(x_1:array).var_1373
 //        return encoded
         return array

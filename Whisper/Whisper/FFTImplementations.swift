@@ -31,7 +31,7 @@ public class ComplexFFTStandard : WhisperFFT
     
     override init(numFFT: Int) {
         
-        let log2n = vDSP_Length(log2(Float(numFFT/2)))
+        let log2n = vDSP_Length(log2(Float(numFFT)))
 
         self.fft = vDSP.FFT(log2n: log2n,
                            radix: .radix2,
@@ -145,6 +145,7 @@ public class PowerSpectrumComplexInterleaved : WhisperFFT
 // Taken from Surge FFT discussion
 public class PowerSpectrum : WhisperFFT
 {
+
     public func forward(_ audioFrame:[Float]) -> ([Float], [Float])
     {
         // window has slightly different precision than scipy.window.hamming (float vs double)
