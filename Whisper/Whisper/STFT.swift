@@ -17,6 +17,13 @@ class STFT
     /// Note, audioFrames we produce are not padded, or reflected or centered
     ///
     
+    enum Padding {
+        case Reflect
+        case Zero
+//        case
+    }
+    
+    
     // MARK: FFT
     
     /// length of the FFT
@@ -26,7 +33,7 @@ class STFT
     var fftWindowLength:Int!
     var fftWindowType:vDSP.WindowSequence!
     
-    private var fft:ComplexFFTStandard!
+    private var fft:RealFFT!
 
     // MARK: STFT
     
@@ -37,31 +44,37 @@ class STFT
     /// Number of samples we shift forward when constructing a new audio frame out of our input audio
     var hopCount:Int!
     
+    var padding:Padding!
+    var center:Bool!
     
     // Calculate the number of iteractions we need to do
     // typically sampleCount / hopCount
     private var stftIterationCount:Int!
     
     
-    init(fftLength:Int, windowType:vDSP.WindowSequence, windowLength:Int, sampleCount:Int, hopCount:Int  )
+    init(fftLength:Int, windowType:vDSP.WindowSequence, windowLength:Int, sampleCount:Int, hopCount:Int, center:Bool = true, padding:Padding = .Reflect )
     {
         self.fftLength = fftLength
         self.fftWindowType = windowType
         self.fftWindowLength = windowLength
-        self.fft = ComplexFFTStandard(numFFT: fftLength)
+        
+        self.fft = RealFFT(numFFT: fftLength)
         
         self.sampleCount = sampleCount
         self.hopCount = hopCount
         self.stftIterationCount = self.sampleCount / self.hopCount
+        
+        self.padding = padding
+        self.center = center
     }
     
     /// Calculate STFT and return matrix of real and imaginary components calculated
-    public func calculateSTFT(audio:[Int16]) -> ([[Float]], [[Float]])
+    public func calculateSTFT(audio:[Int16]) -> ([[Double]], [[Double]])
     {
         // Step 1
         assert(self.sampleCount == audio.count)
 
-        var audioFloat:[Float] = [Float](repeating: 0, count: audio.count)
+        var audioFloat:[Double] = [Double](repeating: 0, count: audio.count)
                 
         vDSP.convertElements(of: audio, to: &audioFloat)
         // Audio now in Float, at Signed Int ranges - matches Pytorch Exactly
@@ -69,17 +82,33 @@ class STFT
         vDSP.divide(audioFloat, 32768.0, result: &audioFloat)
         // Audio now in -1.0 to 1.0 Float ranges - matches Pytorch exactly
 
-        // insert numFFT/2 samples before and numFFT/2 after so we have a extra numFFT amount to process
-        audioFloat.insert(contentsOf: [Float](repeating: 0, count: self.fft.numFFT/2), at: 0)
-        audioFloat.append(contentsOf: [Float](repeating: 0, count: self.fft.numFFT/2))
+        // Center pad, reflect mode
         
-        // Alternatively all at the end?
-//        audioFloat.append(contentsOf: [Float](repeating: 0, count: self.fft.numFFT))
-        
-
+        if (self.center)
+        {
+            switch ( self.padding )
+            {
+            case .Reflect, .none:
+                let reflectStart = audioFloat[0 ..< self.fftLength/2]
+                let reflectEnd = audioFloat[audioFloat.count -  self.fftLength/2 ..< audioFloat.count]
+                
+                audioFloat.insert(contentsOf:reflectStart.reversed(), at: 0)
+                audioFloat.append(contentsOf:reflectEnd.reversed())
+            case .Zero:
+                let zero:[Double] = [Double](repeating: 0, count: self.fftLength/2 )
+                
+                audioFloat.insert(contentsOf:zero, at: 0)
+                audioFloat.append(contentsOf:zero)
+            }
+        }
+        else
+        {
+            // Alternatively all at the end?
+            audioFloat.append(contentsOf: [Double](repeating: 0, count: self.fft.numFFT))
+        }
         // Split Complex arrays holding the FFT results
-        var allSampleReal:[[Float]] = []
-        var allSampleImaginary:[[Float]] = []
+        var allSampleReal:[[Double]] = []
+        var allSampleImaginary:[[Double]] = []
 
         // Step 2 - we need to create 3000 x 200 matrix of windowed FFTs
         // Pytorch outputs complex numbers
@@ -91,22 +120,24 @@ class STFT
             // TODO: Handle Pytorch STFT Defaults:
             // TODO: Handle Centering  = True
             // TODO: Handle Padding = Reflect
-            let audioFrame = Array<Float>( audioFloat[ (m * self.hopCount) ..< ( (m * self.hopCount) + self.fft.numFFT ) ] )
+            let audioFrame = Array<Double>( audioFloat[ (m * self.hopCount) ..< ( (m * self.hopCount) + self.fftLength ) ] )
 
-            assert(audioFrame.count == self.fft.numFFT)
-
+            assert(audioFrame.count == self.fftLength)
+            
             var (real, imaginary) = self.fft.forward(audioFrame)
             
-            // For power spectrum, we ignore last 200 components
-            if (real.count == self.fft.numFFT)
-            {
-                real = Array( real.prefix(upTo: self.fft.numFFT/2) )
-                imaginary = Array( imaginary.prefix(upTo: self.fft.numFFT/2) )
-            }
-
-
-            assert(real.count == self.fft.numFFT / 2)
+            // We divide our half our FFT output,
+            // because the Pytorch `onesized` is true by default for real valued signals
+            // See https://pytorch.org/docs/stable/generated/torch.stft.html
             
+            if (real.count == self.fftLength )
+            {
+                real = Array(real.prefix(upTo: self.fftLength / 2))
+                imaginary = Array(imaginary.prefix(upTo: self.fftLength / 2))
+            }
+            
+            assert(real.count == self.fft.numFFT / 2)
+
             allSampleReal.append(real)
             allSampleImaginary.append(imaginary)
         }

@@ -24,8 +24,8 @@ public class Whisper {
     static let kWhisperNumSamplesInMel:Int = 3000; // frames of Mel spectrograms
     
    
-//    let decoderModel: decoder
-//    let encoderModel: encoder
+    let decoderModel: decoder
+    let encoderModel: encoder
     let tokenizer = WhisperTokenizer()
     
     let mel:MelSpectrogram = MelSpectrogram(sampleCount: kWhisperNumSamplesInChunk, hopCount: kWhisperHopLength, melCount: kWhisperNumMels, numFFT: kWhisperNumFFTs)
@@ -40,30 +40,44 @@ public class Whisper {
         let config = MLModelConfiguration()
         config.computeUnits = .all
         
-//        self.decoderModel = try decoder(configuration: config)
-//        self.encoderModel = try encoder(configuration: config)
+        self.decoderModel = try decoder(configuration: config)
+        self.encoderModel = try encoder(configuration: config)
         
         self.accruedAudioSamples.reserveCapacity( Whisper.kWhisperNumSamplesInChunk )
     }
     
+    func normalize(array: [Float]) -> [Float] {
+        var normalizedArray = array
+           var min = Float.greatestFiniteMagnitude
+           var max = -Float.greatestFiniteMagnitude
+           var shift: Float = 0.0
+           var scale: Float = 0.0
+           
+           vDSP_minv(array, 1, &min, vDSP_Length(array.count))
+           vDSP_maxv(array, 1, &max, vDSP_Length(array.count))
+           shift = abs(min)
+           vDSP_vsadd(array, 1, &shift, &normalizedArray, 1, vDSP_Length(array.count))
+           scale = 1 / (max + shift)
+           vDSP_vsmul(normalizedArray, 1, &scale, &normalizedArray, 1, vDSP_Length(array.count))
+           return normalizedArray
+        
+//        return vDSP.multiply(255.0, normalizedArray)
+        
+    }
+    
     func encode(audio: [Int16]) throws -> MLMultiArray {
-        let mel:[Float] = mel.processData(audio: audio)
-//        let mel = MelSpectrogram.loadReferencePythonRawMelToDebugShit()
+//        let mel:[Float] = mel.processData(audio: audio)
+        let mel = MelSpectrogram.loadReferencePythonRawMelToDebugShit()
         
-        var normalizedFloatMel =  mel
+        let normalizedFloatMel =  self.normalize(array: mel)
         
-        let count = normalizedFloatMel.count
         normalizedFloatMel.withUnsafeBufferPointer { unsafeMel in
             
-//            var four:Float = 4.0
-//            var eight:Float = 8.0
-//            vDSP_vsadd(normalizedFloatMel, 1, &four, &normalizedFloatMel, 1, vDSP_Length(count))
-//            vDSP_vsdiv(normalizedFloatMel, 1, &eight, &normalizedFloatMel, 1, vDSP_Length(count))
             
             
             let data = Data(buffer: unsafeMel)
             do {
-                try data.write(to: URL(fileURLWithPath: "/Users/vade/Downloads/rawMel.raw"))
+                try data.write(to: URL(fileURLWithPath: "/Users/vade/Downloads/rawMel-normalized.raw"))
             }
             catch {
             }
@@ -77,47 +91,47 @@ public class Whisper {
             }
         }
         
-//        let encoded = try encoderModel.prediction(x_1:array).var_1373
-//        return encoded
-        return array
+        let encoded = try encoderModel.prediction(x_1:array).var_1373
+        return encoded
+//        return array
     }
     
     func decode(audioFeatures: MLMultiArray) throws {
         
-//        // SOT Initialize sequence
-//        var tokens:[Int] = []
-//
-//        // create sot sequence
-//        // https://github.com/openai/whisper/blob/main/whisper/tokenizer.py#L325
-//        // https://github.com/huggingface/transformers/blob/main/tests/models/whisper/test_tokenization_whisper.py
-//        tokens.append(WhisperTokenizer.sotToken)
-//        tokens.append(WhisperTokenizer.langToken)
-//        tokens.append(WhisperTokenizer.transcribeToken)
-////        tokens.append(WhisperTokenizer.notToken)
-//        
-//        var nextToken = 0
-//        
-//        while ( nextToken != WhisperTokenizer.eotToken )
-//        {
-//            autoreleasepool {
-//                //            let transcription = self.tokenizer.decode(tokens: tokens)
-//                //
-//                //            print(transcription)
-//                
-//                let tokensArray = self.tokenizer.tokensToMultiArray(tokens, dims: 2)
-//                //            let tokensArray = self.tokenizer.tokensToMultiArray([nextToken], dims: 2)
-//                
-//                let decoded = try! decoderModel.prediction(token_data: tokensArray, audio_data: audioFeatures).var_2205
-//                
-//                nextToken = self.tokenizer.nextTokenGreedy(decoded: decoded)
-//                tokens.append(nextToken)
-//                
-//            }
-//        }
-//        
-//        let transcription = self.tokenizer.decode(tokens: tokens)
-//
-//        print(transcription)
+        // SOT Initialize sequence
+        var tokens:[Int] = []
+
+        // create sot sequence
+        // https://github.com/openai/whisper/blob/main/whisper/tokenizer.py#L325
+        // https://github.com/huggingface/transformers/blob/main/tests/models/whisper/test_tokenization_whisper.py
+        tokens.append(WhisperTokenizer.sotToken)
+        tokens.append(WhisperTokenizer.langToken)
+        tokens.append(WhisperTokenizer.transcribeToken)
+        tokens.append(WhisperTokenizer.notToken)
+        
+        var nextToken = 0
+        
+        while ( nextToken != WhisperTokenizer.eotToken )
+        {
+            autoreleasepool {
+                //            let transcription = self.tokenizer.decode(tokens: tokens)
+                //
+                //            print(transcription)
+                
+                let tokensArray = self.tokenizer.tokensToMultiArray(tokens, dims: 2)
+                //            let tokensArray = self.tokenizer.tokensToMultiArray([nextToken], dims: 2)
+                
+                let decoded = try! decoderModel.prediction(token_data: tokensArray, audio_data: audioFeatures).var_2205
+                
+                nextToken = self.tokenizer.nextTokenGreedy(decoded: decoded)
+                tokens.append(nextToken)
+                
+            }
+        }
+        
+        let transcription = self.tokenizer.decode(tokens: tokens)
+
+        print(transcription)
 
     }
     

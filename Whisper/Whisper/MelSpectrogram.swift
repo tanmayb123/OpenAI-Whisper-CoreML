@@ -56,7 +56,7 @@ public class MelSpectrogram
      
     /// windows for each mel frequency
     /// Our 80 x 201 sized matrix of 16080 float values of precomputed filters.
-    var melFilterMatrix:[Float]
+    var melFilterMatrix:[Double]
     
     /// Tthe width of the spectrogram.
     var melSampleCount:Int = 3000
@@ -94,36 +94,33 @@ public class MelSpectrogram
         let (allSampleReal, allSampleImaginary) = self.stft.calculateSTFT(audio: audio)
 
         // Unroll matrices into flat arrays for vDSP
-        var flattnedReal:[Float] = allSampleReal.flatMap { $0 }
-        var flattnedImaginary:[Float] = allSampleImaginary.flatMap { $0 }
+        var flattnedReal:[Double] = allSampleReal.flatMap { $0 }
+        var flattnedImaginary:[Double] = allSampleImaginary.flatMap { $0 }
 
         print("Swift 0 - complex real min", vDSP.minimum(flattnedReal), "max", vDSP.maximum(flattnedReal))
         print("Swift 0 - complex imag min", vDSP.minimum(flattnedImaginary), "max", vDSP.maximum(flattnedImaginary))
         
         // Take the magnitude squared of the matrix, which results in a Result flat array of 3000 x 200 of real floats
         // Then multiply it with our mel filter bank
-        var magnitudes = [Float](repeating: 0, count: flattnedReal.count)
-        var melSpectroGram = [Float](repeating: 0, count: 80 * 3000)
+        var magnitudes = [Double](repeating: 0, count: flattnedReal.count)
+        var melSpectroGram = [Double](repeating: 0, count: 80 * 3000)
 
         flattnedReal.withUnsafeMutableBytes { unsafeFlatReal in
             flattnedImaginary.withUnsafeMutableBytes { unsafeFlatImaginary in
                 
 //                 We create a Split Complex representation of our flattened real and imaginary component
-                let complexMatrix = DSPSplitComplex(realp: unsafeFlatReal.bindMemory(to: Float.self).baseAddress!,
-                                                    imagp: unsafeFlatImaginary.bindMemory(to: Float.self).baseAddress!)
+                let complexMatrix = DSPDoubleSplitComplex(realp: unsafeFlatReal.bindMemory(to: Double.self).baseAddress!,
+                                                    imagp: unsafeFlatImaginary.bindMemory(to: Double.self).baseAddress!)
 
                 vDSP.squareMagnitudes(complexMatrix, result: &magnitudes)
  
-                // can ditch power spectrum above Nyquist rate
-//                magnitudes = Array( magnitudes.prefix(upTo: (magnitudes.count / 2) ) )
-                
-                
+                                
                 print("Swift 1 - magnitudes min", vDSP.minimum(magnitudes), "max", vDSP.maximum(magnitudes))
                 
 //                 transpose magnitudes from 3000 X 200, to 200 x 3000
-                vDSP_mtrans(magnitudes, 1, &magnitudes, 1, 200, 3000) // verified correct
+//                vDSP_mtransD(magnitudes, 1, &magnitudes, 1, 200, 3000) // verified correct
+                vDSP_mtransD(magnitudes, 1, &magnitudes, 1, 3000, 200) // verified correct
 
-                
                 // Step 5 & 6 (filters loaded earlier)
 
                 // MATRIX A, a MxK sized matrix
@@ -141,7 +138,7 @@ public class MelSpectrogram
                                 
                 // matrix multiply magitude squared matrix with our filter bank
                 // see https://www.advancedswift.com/matrix-math/
-                cblas_sgemm(CblasRowMajor,
+                cblas_dgemm(CblasRowMajor,
                             CblasNoTrans,           // Transpose A
                             CblasNoTrans,           //
                             M,                      // M Number of rows in matrices A and C.
@@ -173,7 +170,7 @@ public class MelSpectrogram
                 // Step 8 -
                 // Clip to new max and updated min
                 let newMin = vDSP.maximum(melSpectroGram) - 8.0
-                vDSP.maximum(melSpectroGram, [Float](repeating: newMin, count: melSpectroGram.count), result: &melSpectroGram)
+                vDSP.maximum(melSpectroGram, [Double](repeating: newMin, count: melSpectroGram.count), result: &melSpectroGram)
             
                 print("Swift 5 - mel log min", vDSP.minimum(melSpectroGram), "max", vDSP.maximum(melSpectroGram))
 
@@ -198,10 +195,10 @@ public class MelSpectrogram
             }
         }
         
-        return melSpectroGram
+        return  vDSP.doubleToFloat(melSpectroGram)
     }
    
-    static func makeFilterBankWithNumpyData() -> [Float] {
+    static func makeFilterBankWithNumpyData() -> [Double] {
 //        let numpyFloatArrayLength = 16080
         let fileURL = Bundle.main.url(forResource: "mel_filters", withExtension:"data")
         let fileHandle = try! FileHandle(forReadingFrom: fileURL!)
@@ -210,8 +207,8 @@ public class MelSpectrogram
         let floatArray = floatData.withUnsafeBytes { unsafeFloatArray in
             return Array(UnsafeBufferPointer<Float>(start: unsafeFloatArray.bindMemory(to: Float.self).baseAddress!, count: floatData.count / MemoryLayout<Float>.stride) )
         }
-
-        return floatArray;
+        
+        return  vDSP.floatToDouble(floatArray);
     }
     
     static func loadReferencePythonRawMelToDebugShit() -> [Float] {
