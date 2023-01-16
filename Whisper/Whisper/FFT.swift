@@ -8,6 +8,9 @@
 import Foundation
 import Accelerate
 
+//figure out if i need to remove the dc offset and nyquist from the returned arrays because maybe im loosing a bin?
+
+
 public class WhisperFFT
 {
 
@@ -32,7 +35,7 @@ public class ComplexFFT : WhisperFFT
     
     override init(numFFT: Int) {
         
-        let log2n = vDSP_Length(log2(Float(numFFT)))
+        let log2n = vDSP_Length(floor(log2(Float(numFFT))))
 
         self.fft = vDSP.FFT(log2n: log2n,
                            radix: .radix2,
@@ -44,7 +47,7 @@ public class ComplexFFT : WhisperFFT
     public func forward(_ audioFrame:[Double]) -> ([Double], [Double])
     {
         var sampleReal:[Double] = [Double](repeating: 0, count: self.numFFT/2)
-        var sampleImaginary:[Double] = [Double](repeating: 0, count: self.numFFT/2)
+        var sampleImaginary:[Double] = [Double](repeating: 0, count:  self.numFFT/2)
 
         var resultReal:[Double] = [Double](repeating: 0, count: self.numFFT/2)
         var resultImaginary:[Double] = [Double](repeating: 0, count: self.numFFT/2)
@@ -68,8 +71,12 @@ public class ComplexFFT : WhisperFFT
                         var complexResult = DSPDoubleSplitComplex(realp: unsafeResultReal.bindMemory(to: Double.self).baseAddress!,
                                                                   imagp: unsafeResultImaginary.bindMemory(to: Double.self).baseAddress!)
                         
+                        // Treat our windowed audio as a Interleaved Complex
+                        // And convert it into a split complex Signal
                         windowedAudioFrame.withUnsafeBytes { unsafeAudioBytes in
-                            vDSP.convert(interleavedComplexVector: [DSPDoubleComplex](unsafeAudioBytes.bindMemory(to: DSPDoubleComplex.self)),
+                            let letInterleavedComplexAudio = [DSPDoubleComplex](unsafeAudioBytes.bindMemory(to: DSPDoubleComplex.self))
+                                                                                
+                            vDSP.convert(interleavedComplexVector:letInterleavedComplexAudio,
                                          toSplitComplexVector: &complexSignal)
                         }
                         
@@ -77,9 +84,10 @@ public class ComplexFFT : WhisperFFT
                         self.fft.transform(input: complexSignal, output: &complexResult, direction: vDSP.FourierTransformDirection.forward)
                     
                         // Scale by 1/2 : https://stackoverflow.com/questions/51804365/why-is-fft-different-in-swift-than-in-python
-                        var scaleFactor = Double( 1.0/2.0 ) // * 1.165 ??
-                        vDSP_vsmulD(complexResult.realp, 1, &scaleFactor, complexResult.realp, 1, vDSP_Length(self.numFFT/2))
-                        vDSP_vsmulD(complexResult.imagp, 1, &scaleFactor, complexResult.imagp, 1, vDSP_Length(self.numFFT/2))
+//                        var scaleFactor = Double( 1.0/2.0 ) // * 1.165 ??
+//                        vDSP_vsmulD(complexResult.realp, 1, &scaleFactor, complexResult.realp, 1, vDSP_Length(self.numFFT/2))
+//                        vDSP_vsmulD(complexResult.imagp, 1, &scaleFactor, complexResult.imagp, 1, vDSP_Length(self.numFFT/2))
+                        
                     }
                 }
             }
@@ -94,12 +102,14 @@ public class ComplexFFT : WhisperFFT
 public class RealFFT : WhisperFFT
 {
 
-    public func forward(_ audioFrame:[Double]) -> ([Double], [Double])
+    public func forward(_ audioFrame:[Double]) -> ([Double], [Double], [Double])
     {
         let input_windowed = vDSP.multiply(audioFrame, self.window)
         
         var real = [Double](input_windowed[0 ..< input_windowed.count])
         var imaginary = [Double](repeating: 0.0, count: input_windowed.count)
+
+        var magnitudes = [Double](repeating: 0.0, count: input_windowed.count)
 
         real.withUnsafeMutableBufferPointer { realBuffer in
             imaginary.withUnsafeMutableBufferPointer { imaginaryBuffer in
@@ -109,27 +119,26 @@ public class RealFFT : WhisperFFT
                     imagp: imaginaryBuffer.baseAddress!
                 )
                 
-                let length = vDSP_Length(floor(log2(Float(input_windowed.count))))
+                let length = vDSP_Length(floor(log2(Float(input_windowed.count ))))
                 let radix = FFTRadix(kFFTRadix2)
                 let weights = vDSP_create_fftsetupD(length, radix)
                 withUnsafeMutablePointer(to: &splitComplex) { splitComplex in
-                    vDSP_fft_zipD(weights!, splitComplex, 1, length, FFTDirection(FFT_FORWARD))
+                    vDSP_fft_zipD(weights!, splitComplex, 1, length , FFTDirection(FFT_FORWARD))
                     
                 }
-                
-                
-//                // zvmags yields power spectrum: |S|^2
-//                withUnsafePointer(to: &splitComplex) { splitComplex in
-//                    magnitudes.withUnsafeMutableBufferPointer { magnitudes in
-//                        vDSP_zvmags(splitComplex, 1, magnitudes.baseAddress!, 1, vDSP_Length(input_windowed.count))
-//                    }
-//                }
-//
+                                
+                // zvmags yields power spectrum: |S|^2
+                withUnsafePointer(to: &splitComplex) { splitComplex in
+                    magnitudes.withUnsafeMutableBufferPointer { magnitudes in
+                        vDSP_zvmagsD(splitComplex, 1, magnitudes.baseAddress!, 1, vDSP_Length(input_windowed.count))
+                    }
+                }
+
 //                vDSP_destroy_fftsetup(weights)
             }
         }
-
-        return (real, imaginary)
+        
+        return (real, imaginary, magnitudes)
     }
     
 }

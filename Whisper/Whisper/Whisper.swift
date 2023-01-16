@@ -24,8 +24,8 @@ public class Whisper {
     static let kWhisperNumSamplesInMel:Int = 3000; // frames of Mel spectrograms
     
    
-    let decoderModel: decoder
-    let encoderModel: encoder
+//    let decoderModel: decoder
+//    let encoderModel: encoder
     let tokenizer = WhisperTokenizer()
     
     let mel:MelSpectrogram = MelSpectrogram(sampleCount: kWhisperNumSamplesInChunk, hopCount: kWhisperHopLength, melCount: kWhisperNumMels, numFFT: kWhisperNumFFTs)
@@ -40,8 +40,8 @@ public class Whisper {
         let config = MLModelConfiguration()
         config.computeUnits = .all
         
-        self.decoderModel = try decoder(configuration: config)
-        self.encoderModel = try encoder(configuration: config)
+//        self.decoderModel = try decoder(configuration: config)
+//        self.encoderModel = try encoder(configuration: config)
         
         self.accruedAudioSamples.reserveCapacity( Whisper.kWhisperNumSamplesInChunk )
     }
@@ -66,8 +66,8 @@ public class Whisper {
     }
     
     func encode(audio: [Int16]) throws -> MLMultiArray {
-//        let mel:[Float] = mel.processData(audio: audio)
-        let mel = MelSpectrogram.loadReferencePythonRawMelToDebugShit()
+        let mel:[Float] = mel.processData(audio: audio)
+//        let mel = MelSpectrogram.loadReferencePythonRawMelToDebugShit()
         
         let normalizedFloatMel =  self.normalize(array: mel)
         
@@ -91,9 +91,9 @@ public class Whisper {
             }
         }
         
-        let encoded = try encoderModel.prediction(x_1:array).var_1373
-        return encoded
-//        return array
+//        let encoded = try encoderModel.prediction(x_1:array).var_1373
+//        return encoded
+        return array
     }
     
     func decode(audioFeatures: MLMultiArray) throws {
@@ -103,36 +103,34 @@ public class Whisper {
 
         // create sot sequence
         // https://github.com/openai/whisper/blob/main/whisper/tokenizer.py#L325
-        // https://github.com/huggingface/transformers/blob/main/tests/models/whisper/test_tokenization_whisper.py
-        tokens.append(WhisperTokenizer.sotToken)
-        tokens.append(WhisperTokenizer.langToken)
-        tokens.append(WhisperTokenizer.transcribeToken)
-        tokens.append(WhisperTokenizer.notToken)
-        
-        var nextToken = 0
-        
-        while ( nextToken != WhisperTokenizer.eotToken )
-        {
-            autoreleasepool {
-                //            let transcription = self.tokenizer.decode(tokens: tokens)
-                //
-                //            print(transcription)
-                
-                let tokensArray = self.tokenizer.tokensToMultiArray(tokens, dims: 2)
-                //            let tokensArray = self.tokenizer.tokensToMultiArray([nextToken], dims: 2)
-                
-                let decoded = try! decoderModel.prediction(token_data: tokensArray, audio_data: audioFeatures).var_2205
-                
-                nextToken = self.tokenizer.nextTokenGreedy(decoded: decoded)
-                tokens.append(nextToken)
-                
-            }
-        }
-        
-        let transcription = self.tokenizer.decode(tokens: tokens)
-
-        print(transcription)
-
+//        // https://github.com/huggingface/transformers/blob/main/tests/models/whisper/test_tokenization_whisper.py
+//        tokens.append(WhisperTokenizer.sotToken)
+//        tokens.append(WhisperTokenizer.langToken)
+//        tokens.append(WhisperTokenizer.transcribeToken)
+//        tokens.append(WhisperTokenizer.notToken)
+//
+//        var nextToken = 0
+//
+//        while ( nextToken != WhisperTokenizer.eotToken )
+//        {
+//            autoreleasepool {
+//
+//                let tokensArray = self.tokenizer.tokensToMultiArray(tokens, dims: 2)
+//
+//                let decoded = try! decoderModel.prediction(token_data: tokensArray, audio_data: audioFeatures).var_2205
+//
+//                nextToken = self.tokenizer.nextTokenGreedy(decoded: decoded)
+//                tokens.append(nextToken)
+//
+//                let transcription = self.tokenizer.decode(tokens: tokens)
+//
+//                print(transcription)
+//            }
+//        }
+//
+//        let transcription = self.tokenizer.decode(tokens: tokens)
+//
+//        print(transcription)
     }
     
     

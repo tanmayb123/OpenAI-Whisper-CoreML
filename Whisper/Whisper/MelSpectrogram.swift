@@ -56,7 +56,7 @@ public class MelSpectrogram
      
     /// windows for each mel frequency
     /// Our 80 x 201 sized matrix of 16080 float values of precomputed filters.
-    var melFilterMatrix:[Double]
+    var melFilterMatrix:[[Double]]
     
     /// Tthe width of the spectrogram.
     var melSampleCount:Int = 3000
@@ -82,20 +82,22 @@ public class MelSpectrogram
         
         self.melSampleCount = self.sampleCount / self.hopCount
 
-        
         self.melFilterMatrix = MelSpectrogram.makeFilterBankWithNumpyData()
         
-        self.stft = STFT(fftLength: numFFT, windowType: .hanningDenormalized, windowLength: numFFT, sampleCount: sampleCount, hopCount: hopCount)
+        self.stft = STFT(fftLength: numFFT, windowType: .hanningDenormalized, windowLength: numFFT, sampleCount: sampleCount, hopCount: hopCount, center: true, padding: .Reflect)
     }
 
     func processData(audio: [Int16]) -> [Float]
     {
         // Calculate STFT
-        let (allSampleReal, allSampleImaginary) = self.stft.calculateSTFT(audio: audio)
+        let (allSampleReal, allSampleImaginary, allSampleMagnitudes) = self.stft.calculateSTFT(audio: audio)
 
         // Unroll matrices into flat arrays for vDSP
         var flattnedReal:[Double] = allSampleReal.flatMap { $0 }
         var flattnedImaginary:[Double] = allSampleImaginary.flatMap { $0 }
+        var flattenedMagnitudes:[Double] = allSampleMagnitudes.flatMap { $0 }
+        
+        let flattenedMelMatrix = self.melFilterMatrix.flatMap{ $0 }
 
         print("Swift 0 - complex real min", vDSP.minimum(flattnedReal), "max", vDSP.maximum(flattnedReal))
         print("Swift 0 - complex imag min", vDSP.minimum(flattnedImaginary), "max", vDSP.maximum(flattnedImaginary))
@@ -105,6 +107,7 @@ public class MelSpectrogram
         var magnitudes = [Double](repeating: 0, count: flattnedReal.count)
         var melSpectroGram = [Double](repeating: 0, count: 80 * 3000)
 
+        
         flattnedReal.withUnsafeMutableBytes { unsafeFlatReal in
             flattnedImaginary.withUnsafeMutableBytes { unsafeFlatImaginary in
                 
@@ -115,12 +118,13 @@ public class MelSpectrogram
                 vDSP.squareMagnitudes(complexMatrix, result: &magnitudes)
  
                                 
-                print("Swift 1 - magnitudes min", vDSP.minimum(magnitudes), "max", vDSP.maximum(magnitudes))
-                
-//                 transpose magnitudes from 3000 X 200, to 200 x 3000
-//                vDSP_mtransD(magnitudes, 1, &magnitudes, 1, 200, 3000) // verified correct
-                vDSP_mtransD(magnitudes, 1, &magnitudes, 1, 3000, 200) // verified correct
+                print("Swift 1 - magnitudes min     ", vDSP.minimum(magnitudes), "max", vDSP.maximum(magnitudes))
+                print("Swift 1 - magnitudes min     ", vDSP.minimum(flattenedMagnitudes), "max", vDSP.maximum(flattenedMagnitudes))
 
+//                 transpose magnitudes from 3000 X 200, to 200 x 3000
+                vDSP_mtransD(flattenedMagnitudes, 1, &flattenedMagnitudes, 1, 201, 3000) // verified correct
+
+                
                 // Step 5 & 6 (filters loaded earlier)
 
                 // MATRIX A, a MxK sized matrix
@@ -134,7 +138,7 @@ public class MelSpectrogram
                 
                 let M: Int32 = 80 // number of rows in matrix A
                 let N: Int32 = 3000 // number of columns in matrix B
-                let K: Int32 = 200 // number of columns in matrix A and number of rows in
+                let K: Int32 = 201 // number of columns in matrix A and number of rows in
                                 
                 // matrix multiply magitude squared matrix with our filter bank
                 // see https://www.advancedswift.com/matrix-math/
@@ -145,9 +149,9 @@ public class MelSpectrogram
                             N,                      // N Number of columns in matrices B and C.
                             K,                      // K Number of columns in matrix A; number of rows in matrix B.
                             1.0,                    // Alpha Scaling factor for the product of matrices A and B.
-                            self.melFilterMatrix,   // Matrix A
+                            flattenedMelMatrix,     // Matrix A
                             K,                      // LDA The size of the first dimension of matrix A; if you are passing a matrix A[m][n], the value should be m.
-                            magnitudes,             // Matrix B
+                            flattenedMagnitudes,             // Matrix B
                             N,                      // LDB The size of the first dimension of matrix B; if you are passing a matrix B[m][n], the value should be m.
                             0,                      // Beta Scaling factor for matrix C.
                             &melSpectroGram,        // Matrix C
@@ -155,16 +159,16 @@ public class MelSpectrogram
                 
         
                 
-                print("Swift 2 - mel min", vDSP.minimum(melSpectroGram), "max", vDSP.maximum(melSpectroGram))
+                print("Swift 2 - mel min            ", vDSP.minimum(melSpectroGram), "max", vDSP.maximum(melSpectroGram))
 
                 // Step 7 - clamp / clip the min to 1e-10
                 vDSP.threshold(melSpectroGram, to: 1e-10, with: .clampToThreshold, result: &melSpectroGram)
 
-                print("Swift 3 - mel clip min", vDSP.minimum(melSpectroGram), "max", vDSP.maximum(melSpectroGram))
+                print("Swift 3 - mel clip min       ", vDSP.minimum(melSpectroGram), "max", vDSP.maximum(melSpectroGram))
 
                 // Step 7 - Take the log base 10 - vDSP_vdbcon and power:toDecibels seems to fuck things up here and isnt right, even though its what everyone else uses?
                 vForce.log10(melSpectroGram, result: &melSpectroGram)
-                print("Swift 4 - mel log min", vDSP.minimum(melSpectroGram), "max", vDSP.maximum(melSpectroGram))
+                print("Swift 4 - mel log min       ", vDSP.minimum(melSpectroGram), "max", vDSP.maximum(melSpectroGram))
 
                                 
                 // Step 8 -
@@ -172,7 +176,7 @@ public class MelSpectrogram
                 let newMin = vDSP.maximum(melSpectroGram) - 8.0
                 vDSP.maximum(melSpectroGram, [Double](repeating: newMin, count: melSpectroGram.count), result: &melSpectroGram)
             
-                print("Swift 5 - mel log min", vDSP.minimum(melSpectroGram), "max", vDSP.maximum(melSpectroGram))
+                print("Swift 5 - mel log min       ", vDSP.minimum(melSpectroGram), "max", vDSP.maximum(melSpectroGram))
 
                 // Step 9 - Add 4 and Divide by 4
                 vDSP.add(4.0, melSpectroGram, result: &melSpectroGram)
@@ -180,25 +184,25 @@ public class MelSpectrogram
                 
                 
                 
-                print("Swift 6 - mel log norm min", vDSP.minimum(melSpectroGram), "max", vDSP.maximum(melSpectroGram))
+                print("Swift 6 - mel log norm min  ", vDSP.minimum(melSpectroGram), "max", vDSP.maximum(melSpectroGram))
 
                 print("--------------")
 
-                print("Torch 0 - complex real min -11.8792142868) max 12.0689258575")
-                print("Torch 0 - complex imag min -10.5751876831) max 11.5213479996")
-                print("Torch 1 - magnitudes min 0.0000000000 max 165.6671142578")
-                print("Torch 2 - mel min 0.0000000036 max tensor(4.2800636292)")
-                print("Torch 3 - mel clip min 0.0000000036 max 4.2800636292")
-                print("Torch 4 - mel log min -8.4495277405 max 0.6314502358")
-                print("Torch 5 - mel log min -7.3685498238 max 0.6314502358")
-                print("Torch 6 - mel log norm min -0.8421374559 max 1.1578625441")
+                print("Torch 0 - complex real min -11.8792142868 max 12.0689258575")
+                print("Torch 0 - complex imag min -10.5751876831 max 11.5213479996")
+                print("Torch 1 - magnitudes min     0.0000000000 max 165.6671142578")
+                print("Torch 2 - mel min            0.0000000036 max 4.2800636292")
+                print("Torch 3 - mel clip min       0.0000000036 max 4.2800636292")
+                print("Torch 4 - mel log min       -8.4495277405 max 0.6314502358")
+                print("Torch 5 - mel log min       -7.3685498238 max 0.6314502358")
+                print("Torch 6 - mel log norm min  -0.8421374559 max 1.1578625441")
             }
         }
         
         return  vDSP.doubleToFloat(melSpectroGram)
     }
    
-    static func makeFilterBankWithNumpyData() -> [Double] {
+    static func makeFilterBankWithNumpyData() -> [[Double]] {
 //        let numpyFloatArrayLength = 16080
         let fileURL = Bundle.main.url(forResource: "mel_filters", withExtension:"data")
         let fileHandle = try! FileHandle(forReadingFrom: fileURL!)
@@ -208,7 +212,9 @@ public class MelSpectrogram
             return Array(UnsafeBufferPointer<Float>(start: unsafeFloatArray.bindMemory(to: Float.self).baseAddress!, count: floatData.count / MemoryLayout<Float>.stride) )
         }
         
-        return  vDSP.floatToDouble(floatArray);
+        let doubleArray =  vDSP.floatToDouble(floatArray);
+        
+        return doubleArray.chunked(into: 80)
     }
     
     static func loadReferencePythonRawMelToDebugShit() -> [Float] {

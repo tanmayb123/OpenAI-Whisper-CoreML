@@ -54,11 +54,12 @@ class STFT
     
     init(fftLength:Int, windowType:vDSP.WindowSequence, windowLength:Int, sampleCount:Int, hopCount:Int, center:Bool = true, padding:Padding = .Reflect )
     {
+        self.fft = RealFFT(numFFT: fftLength)
+
         self.fftLength = fftLength
         self.fftWindowType = windowType
         self.fftWindowLength = windowLength
         
-        self.fft = RealFFT(numFFT: fftLength)
         
         self.sampleCount = sampleCount
         self.hopCount = hopCount
@@ -69,7 +70,7 @@ class STFT
     }
     
     /// Calculate STFT and return matrix of real and imaginary components calculated
-    public func calculateSTFT(audio:[Int16]) -> ([[Double]], [[Double]])
+    public func calculateSTFT(audio:[Int16]) -> ([[Double]], [[Double]], [[Double]])
     {
         // Step 1
         assert(self.sampleCount == audio.count)
@@ -104,11 +105,12 @@ class STFT
         else
         {
             // Alternatively all at the end?
-            audioFloat.append(contentsOf: [Double](repeating: 0, count: self.fft.numFFT))
+            audioFloat.append(contentsOf: [Double](repeating: 0, count: self.fftLength))
         }
         // Split Complex arrays holding the FFT results
         var allSampleReal:[[Double]] = []
         var allSampleImaginary:[[Double]] = []
+        var allSampleMagnitudes:[[Double]] = []
 
         // Step 2 - we need to create 3000 x 200 matrix of windowed FFTs
         // Pytorch outputs complex numbers
@@ -124,7 +126,7 @@ class STFT
 
             assert(audioFrame.count == self.fftLength)
             
-            var (real, imaginary) = self.fft.forward(audioFrame)
+            var (real, imaginary, magnitudes) = self.fft.forward(audioFrame)
             
             // We divide our half our FFT output,
             // because the Pytorch `onesized` is true by default for real valued signals
@@ -132,17 +134,21 @@ class STFT
             
             if (real.count == self.fftLength )
             {
-                real = Array(real.prefix(upTo: self.fftLength / 2))
-                imaginary = Array(imaginary.prefix(upTo: self.fftLength / 2))
+                real = Array(real.prefix(upTo:1 + self.fftLength / 2))
+                imaginary = Array(imaginary.prefix(upTo:1 + self.fftLength / 2))
+                magnitudes = Array(magnitudes.prefix(upTo:1 + self.fftLength / 2))
+
             }
             
-            assert(real.count == self.fft.numFFT / 2)
+            assert(real.count == 1 + self.fft.numFFT / 2)
+            assert(imaginary.count == 1 +  self.fft.numFFT / 2)
 
             allSampleReal.append(real)
             allSampleImaginary.append(imaginary)
+            allSampleMagnitudes.append(magnitudes)
         }
         
-        return (allSampleReal, allSampleImaginary)
+        return (allSampleReal, allSampleImaginary, allSampleMagnitudes)
     }
     
 }
