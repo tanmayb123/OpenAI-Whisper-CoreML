@@ -11,12 +11,23 @@
 		01AF98FB28E28BF2002DAC53 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01AF98FA28E28BF2002DAC53 /* ContentView.swift */; };
 		01AF98FD28E28BF3002DAC53 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 01AF98FC28E28BF3002DAC53 /* Assets.xcassets */; };
 		01AF990028E28BF3002DAC53 /* Preview Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 01AF98FF28E28BF3002DAC53 /* Preview Assets.xcassets */; };
-		01AF990C28E28C8C002DAC53 /* stft.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01AF990B28E28C8C002DAC53 /* stft.swift */; };
-		01AF991C28E2A948002DAC53 /* decoder.mlpackage in Sources */ = {isa = PBXBuildFile; fileRef = 01AF991A28E2A944002DAC53 /* decoder.mlpackage */; };
-		01AF991D28E2A948002DAC53 /* encoder.mlpackage in Sources */ = {isa = PBXBuildFile; fileRef = 01AF991B28E2A948002DAC53 /* encoder.mlpackage */; };
 		01AF991F28E2A97E002DAC53 /* Whisper.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01AF991E28E2A97E002DAC53 /* Whisper.swift */; };
-		01AF992328E2D5FF002DAC53 /* libstft.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 01AF992228E2D5FF002DAC53 /* libstft.a */; };
 		01AF992528E2D90F002DAC53 /* AudioRecorder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01AF992428E2D90F002DAC53 /* AudioRecorder.swift */; };
+		1B58A60E296A3B40006E0969 /* Math.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1B58A60D296A3B40006E0969 /* Math.swift */; };
+		1B58A610296A3BAB006E0969 /* MLMultiArray+Utils.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1B58A60F296A3BAB006E0969 /* MLMultiArray+Utils.swift */; };
+		1B58A613296BD704006E0969 /* multilingual-vocab.json in Resources */ = {isa = PBXBuildFile; fileRef = 1B58A611296BD704006E0969 /* multilingual-vocab.json */; };
+		1B58A614296BD704006E0969 /* multilingual-merges.txt in Resources */ = {isa = PBXBuildFile; fileRef = 1B58A612296BD704006E0969 /* multilingual-merges.txt */; };
+		1B58A618296E03FF006E0969 /* python_log_mel.raw in Resources */ = {isa = PBXBuildFile; fileRef = 1B58A617296E03FE006E0969 /* python_log_mel.raw */; };
+		1B58A61A2970C127006E0969 /* FFT.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1B58A6192970C127006E0969 /* FFT.swift */; };
+		1B58A61C29733174006E0969 /* STFT.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1B58A61B29733173006E0969 /* STFT.swift */; };
+		1B6A59D929634F2A004C510D /* MelSpectrogram.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1B6A59D829634F2A004C510D /* MelSpectrogram.swift */; };
+		1B6A59DC29635145004C510D /* decoder.mlpackage in Sources */ = {isa = PBXBuildFile; fileRef = 1B6A59DA29635145004C510D /* decoder.mlpackage */; };
+		1B6A59DD29635145004C510D /* encoder.mlpackage in Sources */ = {isa = PBXBuildFile; fileRef = 1B6A59DB29635145004C510D /* encoder.mlpackage */; };
+		1B6A59DF2963A1A6004C510D /* mel_filters.data in Resources */ = {isa = PBXBuildFile; fileRef = 1B6A59DE2963A1A6004C510D /* mel_filters.data */; };
+		1B6A59E12963A670004C510D /* AudioLoader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1B6A59E02963A670004C510D /* AudioLoader.swift */; };
+		1BFAC9DD2968F0A900A5A099 /* WhisperTokenizer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1BFAC9DC2968F0A900A5A099 /* WhisperTokenizer.swift */; };
+		1BFAC9E02968F11100A5A099 /* gpt2-merges.txt in Resources */ = {isa = PBXBuildFile; fileRef = 1BFAC9DE2968F11100A5A099 /* gpt2-merges.txt */; };
+		1BFAC9E12968F11100A5A099 /* gpt2-vocab.json in Resources */ = {isa = PBXBuildFile; fileRef = 1BFAC9DF2968F11100A5A099 /* gpt2-vocab.json */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -26,14 +37,24 @@
 		01AF98FC28E28BF3002DAC53 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		01AF98FF28E28BF3002DAC53 /* Preview Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = "Preview Assets.xcassets"; sourceTree = "<group>"; };
 		01AF990928E28C2E002DAC53 /* libresolv.tbd */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.text-based-dylib-definition"; name = libresolv.tbd; path = usr/lib/libresolv.tbd; sourceTree = SDKROOT; };
-		01AF990A28E28C44002DAC53 /* bridge.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = bridge.h; sourceTree = "<group>"; };
-		01AF990B28E28C8C002DAC53 /* stft.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = stft.swift; sourceTree = "<group>"; };
-		01AF991A28E2A944002DAC53 /* decoder.mlpackage */ = {isa = PBXFileReference; lastKnownFileType = folder.mlpackage; path = decoder.mlpackage; sourceTree = "<group>"; };
-		01AF991B28E2A948002DAC53 /* encoder.mlpackage */ = {isa = PBXFileReference; lastKnownFileType = folder.mlpackage; path = encoder.mlpackage; sourceTree = "<group>"; };
 		01AF991E28E2A97E002DAC53 /* Whisper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Whisper.swift; sourceTree = "<group>"; };
-		01AF992228E2D5FF002DAC53 /* libstft.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; path = libstft.a; sourceTree = "<group>"; };
 		01AF992428E2D90F002DAC53 /* AudioRecorder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioRecorder.swift; sourceTree = "<group>"; };
 		01AF992628E2D9B9002DAC53 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		1B58A60D296A3B40006E0969 /* Math.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = Math.swift; sourceTree = "<group>"; };
+		1B58A60F296A3BAB006E0969 /* MLMultiArray+Utils.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = "MLMultiArray+Utils.swift"; sourceTree = "<group>"; };
+		1B58A611296BD704006E0969 /* multilingual-vocab.json */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.json; path = "multilingual-vocab.json"; sourceTree = "<group>"; };
+		1B58A612296BD704006E0969 /* multilingual-merges.txt */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = "multilingual-merges.txt"; sourceTree = "<group>"; };
+		1B58A617296E03FE006E0969 /* python_log_mel.raw */ = {isa = PBXFileReference; lastKnownFileType = file; path = python_log_mel.raw; sourceTree = "<group>"; };
+		1B58A6192970C127006E0969 /* FFT.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FFT.swift; sourceTree = "<group>"; };
+		1B58A61B29733173006E0969 /* STFT.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = STFT.swift; sourceTree = "<group>"; };
+		1B6A59D829634F2A004C510D /* MelSpectrogram.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MelSpectrogram.swift; sourceTree = "<group>"; };
+		1B6A59DA29635145004C510D /* decoder.mlpackage */ = {isa = PBXFileReference; lastKnownFileType = folder.mlpackage; path = decoder.mlpackage; sourceTree = "<group>"; };
+		1B6A59DB29635145004C510D /* encoder.mlpackage */ = {isa = PBXFileReference; lastKnownFileType = folder.mlpackage; path = encoder.mlpackage; sourceTree = "<group>"; };
+		1B6A59DE2963A1A6004C510D /* mel_filters.data */ = {isa = PBXFileReference; lastKnownFileType = file; path = mel_filters.data; sourceTree = "<group>"; };
+		1B6A59E02963A670004C510D /* AudioLoader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioLoader.swift; sourceTree = "<group>"; };
+		1BFAC9DC2968F0A900A5A099 /* WhisperTokenizer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WhisperTokenizer.swift; sourceTree = "<group>"; };
+		1BFAC9DE2968F11100A5A099 /* gpt2-merges.txt */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = "gpt2-merges.txt"; sourceTree = "<group>"; };
+		1BFAC9DF2968F11100A5A099 /* gpt2-vocab.json */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.json; path = "gpt2-vocab.json"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -41,7 +62,6 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				01AF992328E2D5FF002DAC53 /* libstft.a in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -69,15 +89,25 @@
 			isa = PBXGroup;
 			children = (
 				01AF992628E2D9B9002DAC53 /* Info.plist */,
-				01AF992228E2D5FF002DAC53 /* libstft.a */,
-				01AF990A28E28C44002DAC53 /* bridge.h */,
-				01AF991A28E2A944002DAC53 /* decoder.mlpackage */,
-				01AF991B28E2A948002DAC53 /* encoder.mlpackage */,
-				01AF990B28E28C8C002DAC53 /* stft.swift */,
-				01AF991E28E2A97E002DAC53 /* Whisper.swift */,
-				01AF992428E2D90F002DAC53 /* AudioRecorder.swift */,
 				01AF98F828E28BF2002DAC53 /* WhisperApp.swift */,
+				01AF991E28E2A97E002DAC53 /* Whisper.swift */,
+				1BFAC9DC2968F0A900A5A099 /* WhisperTokenizer.swift */,
+				1B58A6192970C127006E0969 /* FFT.swift */,
+				1B58A61B29733173006E0969 /* STFT.swift */,
+				1B6A59D829634F2A004C510D /* MelSpectrogram.swift */,
+				01AF992428E2D90F002DAC53 /* AudioRecorder.swift */,
+				1B6A59E02963A670004C510D /* AudioLoader.swift */,
 				01AF98FA28E28BF2002DAC53 /* ContentView.swift */,
+				1B58A60D296A3B40006E0969 /* Math.swift */,
+				1B58A60F296A3BAB006E0969 /* MLMultiArray+Utils.swift */,
+				1B6A59DA29635145004C510D /* decoder.mlpackage */,
+				1B6A59DB29635145004C510D /* encoder.mlpackage */,
+				1B6A59DE2963A1A6004C510D /* mel_filters.data */,
+				1BFAC9DE2968F11100A5A099 /* gpt2-merges.txt */,
+				1BFAC9DF2968F11100A5A099 /* gpt2-vocab.json */,
+				1B58A612296BD704006E0969 /* multilingual-merges.txt */,
+				1B58A611296BD704006E0969 /* multilingual-vocab.json */,
+				1B58A617296E03FE006E0969 /* python_log_mel.raw */,
 				01AF98FC28E28BF3002DAC53 /* Assets.xcassets */,
 				01AF98FE28E28BF3002DAC53 /* Preview Content */,
 			);
@@ -158,7 +188,13 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				1B6A59DF2963A1A6004C510D /* mel_filters.data in Resources */,
 				01AF990028E28BF3002DAC53 /* Preview Assets.xcassets in Resources */,
+				1B58A618296E03FF006E0969 /* python_log_mel.raw in Resources */,
+				1B58A614296BD704006E0969 /* multilingual-merges.txt in Resources */,
+				1B58A613296BD704006E0969 /* multilingual-vocab.json in Resources */,
+				1BFAC9E02968F11100A5A099 /* gpt2-merges.txt in Resources */,
+				1BFAC9E12968F11100A5A099 /* gpt2-vocab.json in Resources */,
 				01AF98FD28E28BF3002DAC53 /* Assets.xcassets in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -170,13 +206,19 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				01AF991D28E2A948002DAC53 /* encoder.mlpackage in Sources */,
 				01AF992528E2D90F002DAC53 /* AudioRecorder.swift in Sources */,
+				1BFAC9DD2968F0A900A5A099 /* WhisperTokenizer.swift in Sources */,
 				01AF98FB28E28BF2002DAC53 /* ContentView.swift in Sources */,
+				1B6A59DC29635145004C510D /* decoder.mlpackage in Sources */,
+				1B6A59D929634F2A004C510D /* MelSpectrogram.swift in Sources */,
+				1B58A610296A3BAB006E0969 /* MLMultiArray+Utils.swift in Sources */,
 				01AF98F928E28BF2002DAC53 /* WhisperApp.swift in Sources */,
-				01AF991C28E2A948002DAC53 /* decoder.mlpackage in Sources */,
+				1B6A59E12963A670004C510D /* AudioLoader.swift in Sources */,
+				1B58A61C29733174006E0969 /* STFT.swift in Sources */,
+				1B58A61A2970C127006E0969 /* FFT.swift in Sources */,
+				1B6A59DD29635145004C510D /* encoder.mlpackage in Sources */,
 				01AF991F28E2A97E002DAC53 /* Whisper.swift in Sources */,
-				01AF990C28E28C8C002DAC53 /* stft.swift in Sources */,
+				1B58A60E296A3B40006E0969 /* Math.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -305,9 +347,8 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_ASSET_PATHS = "\"Whisper/Preview Content\"";
-				DEVELOPMENT_TEAM = 998XWVFVMR;
+				DEVELOPMENT_TEAM = SHG3AW6YV7;
 				ENABLE_PREVIEWS = YES;
-				GCC_OPTIMIZATION_LEVEL = fast;
 				GENERATE_INFOPLIST_FILE = YES;
 				HEADER_SEARCH_PATHS = "$(PROJECT_DIR)/Whisper";
 				INFOPLIST_FILE = Whisper/Info.plist;
@@ -317,6 +358,7 @@
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationPortrait;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight UIInterfaceOrientationPortraitUpsideDown";
+				IPHONEOS_DEPLOYMENT_TARGET = 15.5;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -325,12 +367,15 @@
 					"$(inherited)",
 					"$(PROJECT_DIR)/Whisper",
 				);
+				MACOSX_DEPLOYMENT_TARGET = 12.4;
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = tbss.Whisper;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx";
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
 				SWIFT_EMIT_LOC_STRINGS = YES;
-				SWIFT_OBJC_BRIDGING_HEADER = "$(PROJECT_DIR)/Whisper/bridge.h";
-				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
@@ -344,8 +389,9 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_ASSET_PATHS = "\"Whisper/Preview Content\"";
-				DEVELOPMENT_TEAM = 998XWVFVMR;
+				DEVELOPMENT_TEAM = SHG3AW6YV7;
 				ENABLE_PREVIEWS = YES;
+				GCC_OPTIMIZATION_LEVEL = fast;
 				GENERATE_INFOPLIST_FILE = YES;
 				HEADER_SEARCH_PATHS = "$(PROJECT_DIR)/Whisper";
 				INFOPLIST_FILE = Whisper/Info.plist;
@@ -355,6 +401,7 @@
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationPortrait;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight UIInterfaceOrientationPortraitUpsideDown";
+				IPHONEOS_DEPLOYMENT_TARGET = 15.5;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -363,11 +410,15 @@
 					"$(inherited)",
 					"$(PROJECT_DIR)/Whisper",
 				);
+				MACOSX_DEPLOYMENT_TARGET = 12.4;
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = tbss.Whisper;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx";
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
 				SWIFT_EMIT_LOC_STRINGS = YES;
-				SWIFT_OBJC_BRIDGING_HEADER = "$(PROJECT_DIR)/Whisper/bridge.h";
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
